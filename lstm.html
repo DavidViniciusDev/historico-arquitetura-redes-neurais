@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LSTM e GRU — Página Detalhada</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <nav class="topnav">
+    <a href="index.html">← Voltar ao índice</a>
+    <span class="crumbs">Arquitetura · 1997 / 2014</span>
+  </nav>
+
+  <header class="hero">
+    <div class="eyebrow">A engenharia da memória de longo prazo · 1997 → 2014</div>
+    <h1>LSTM e GRU</h1>
+    <p class="lead">
+      As RNNs simples esquecem rápido. A LSTM resolveu isso com uma ideia
+      brilhante: <em>portões diferenciáveis</em> que aprendem o que esquecer,
+      o que lembrar e o que mostrar. Por quase 20 anos, foi o estado da arte
+      em processamento de sequências.
+    </p>
+  </header>
+
+  <div class="toc">
+    <h4>Sumário</h4>
+    <ol>
+      <li><a href="#contexto">A motivação: por que RNNs simples não bastam</a></li>
+      <li><a href="#ideia">A grande ideia: a esteira da memória</a></li>
+      <li><a href="#portoes">Os três portões</a></li>
+      <li><a href="#anatomia">Anatomia completa da célula LSTM</a></li>
+      <li><a href="#fluxo">O fluxo de informação passo a passo</a></li>
+      <li><a href="#equacoes">Equações em detalhe</a></li>
+      <li><a href="#gru">GRU: a versão simplificada</a></li>
+      <li><a href="#peephole">Variantes: peephole, projection, etc.</a></li>
+      <li><a href="#dicas">Dicas práticas de treinamento</a></li>
+      <li><a href="#aplicacoes">A era LSTM (2014-2017)</a></li>
+      <li><a href="#hoje">A LSTM hoje: ainda viva</a></li>
+      <li><a href="#impl">Implementações</a></li>
+      <li><a href="#artigos">Artigos seminais</a></li>
+      <li><a href="#aprofundar">Para se aprofundar</a></li>
+    </ol>
+  </div>
+
+  <!-- ============ CONTEXTO ============ -->
+  <section class="block" id="contexto">
+    <h2><span class="num">1</span> A motivação: por que RNNs simples não bastam</h2>
+
+    <p>
+      Em 1991, Sepp Hochreiter (na época aluno de doutorado de Jürgen Schmidhuber
+      na TU München) publicou em sua tese de mestrado uma análise matemática
+      precisa de um problema que muitos pesquisadores haviam observado mas
+      ninguém formalizado: <strong>RNNs simples não conseguem aprender
+      dependências de longo prazo</strong>.
+    </p>
+
+    <p>
+      O motivo, em uma frase: durante o backpropagation, os gradientes são
+      multiplicados pela mesma matriz a cada passo, e desaparecem (ou explodem)
+      exponencialmente. Em sequências longas, as primeiras palavras "somem"
+      antes do gradiente chegar a elas.
+    </p>
+
+    <h3>O exemplo clássico</h3>
+    <p>
+      Suponha uma tarefa: dada a sentença <em>"Eu cresci na Alemanha... [muitas
+      frases sobre comida, escola, viagens]... eu falo fluentemente
+      ____"</em>, a rede precisa prever <strong>alemão</strong>. A informação
+      crítica ("Alemanha") está a dezenas ou centenas de palavras de distância
+      da previsão. RNNs simples já perderam esse sinal.
+    </p>
+
+    <p>
+      Em 1997, Hochreiter e Schmidhuber publicaram a solução. O artigo se chama
+      <em>"Long Short-Term Memory"</em> — um nome curioso que faz sentido só
+      depois de entender: a rede mantém uma memória <strong>de curto prazo</strong>
+      (estado oculto), mas com <strong>persistência longa</strong> (graças aos
+      portões).
+    </p>
+  </section>
+
+  <!-- ============ IDEIA ============ -->
+  <section class="block" id="ideia">
+    <h2><span class="num">2</span> A grande ideia: a esteira da memória</h2>
+
+    <p>
+      A inovação central da LSTM é introduzir uma <strong>célula de estado</strong>
+      (cₜ) — uma "esteira" que atravessa toda a sequência com modificações mínimas.
+      Em vez de calcular o novo estado oculto multiplicando por uma matriz (como
+      na RNN simples), a LSTM <em>adiciona</em> ou <em>remove</em> informação da
+      esteira de forma controlada.
+    </p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg">
+        <!-- esteira -->
+        <line x1="60" y1="100" x2="660" y2="100" stroke="#4fd1c5" stroke-width="6"/>
+        <text x="40" y="95" fill="#4fd1c5" font-weight="700">cₜ₋₁</text>
+        <text x="685" y="95" fill="#4fd1c5" font-weight="700">cₜ</text>
+
+        <!-- forget gate -->
+        <circle cx="200" cy="100" r="22" fill="#ff7a90"/>
+        <text x="200" y="105" text-anchor="middle" fill="#fff" font-weight="700" font-size="14">×</text>
+        <text x="200" y="150" text-anchor="middle" fill="#ff7a90" class="svg-label">forget</text>
+
+        <!-- input gate -->
+        <circle cx="380" cy="100" r="22" fill="#ffb86b"/>
+        <text x="380" y="105" text-anchor="middle" fill="#fff" font-weight="700" font-size="14">+</text>
+        <text x="380" y="150" text-anchor="middle" fill="#ffb86b" class="svg-label">input</text>
+
+        <!-- output gate -->
+        <circle cx="560" cy="100" r="22" fill="#b07aff"/>
+        <text x="560" y="105" text-anchor="middle" fill="#fff" font-weight="700" font-size="14">×</text>
+        <text x="560" y="150" text-anchor="middle" fill="#b07aff" class="svg-label">output</text>
+
+        <text x="360" y="30" text-anchor="middle" fill="#e9ecf8" font-weight="700">A "esteira" cₜ: informação flui com pouca interferência.</text>
+        <text x="360" y="180" text-anchor="middle" class="svg-label">Os portões aprendem onde modificar a esteira.</text>
+      </svg>
+      <div class="caption">A LSTM mantém uma "esteira de memória" que atravessa toda a sequência. Portões controlam o que é apagado, adicionado e exposto.</div>
+    </div>
+
+    <div class="analogy">
+      <span class="tag">Analogia · esteira do aeroporto</span>
+      <p>
+        Imagine a esteira de bagagens de um aeroporto. As malas (informação)
+        andam ao longo da esteira. Em vários pontos, há funcionários:
+      </p>
+      <p>
+        — <strong>Um filtro</strong> que tira algumas malas (forget gate).<br>
+        — <strong>Uma rampa</strong> onde novas malas são adicionadas (input gate).<br>
+        — <strong>Uma janela</strong> que mostra quais malas devem ser visíveis no
+        momento (output gate).
+      </p>
+      <p>
+        A esteira em si é simples — só uma linha contínua. A inteligência está em
+        decidir <em>quando</em> e <em>onde</em> cada operação acontece.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ PORTÕES ============ -->
+  <section class="block" id="portoes">
+    <h2><span class="num">3</span> Os três portões</h2>
+
+    <p>
+      Um portão (gate) é simplesmente um <strong>neurônio sigmoid</strong> cuja
+      saída multiplica algum vetor. A sigmoid produz valores entre 0 e 1:
+    </p>
+    <ul>
+      <li>Sigmoid próxima de <strong>0</strong>: o portão "fecha" — quase nada passa.</li>
+      <li>Sigmoid próxima de <strong>1</strong>: o portão "abre" — tudo passa.</li>
+    </ul>
+    <p>
+      O importante é que os portões são <strong>diferenciáveis</strong>, ou seja,
+      a própria rede aprende, via backpropagation, quando abrir e fechar cada um.
+    </p>
+
+    <h3>Forget gate (fₜ)</h3>
+    <p>
+      Decide o que <em>apagar</em> da memória. Recebe o estado oculto anterior
+      hₜ₋₁ e a entrada atual xₜ. Produz um vetor de 0s e 1s do mesmo tamanho da
+      esteira.
+    </p>
+    <div class="formula">
+      fₜ = σ(Wf · [hₜ₋₁, xₜ] + bf)
+    </div>
+
+    <h3>Input gate (iₜ) e candidato (c̃ₜ)</h3>
+    <p>
+      Decide o que <em>adicionar</em> à memória. Tem duas partes: o portão iₜ
+      (sigmoid, controla intensidade) e o candidato c̃ₜ (tanh, produz o valor).
+    </p>
+    <div class="formula">
+      iₜ = σ(Wi · [hₜ₋₁, xₜ] + bi)<br>
+      c̃ₜ = tanh(Wc · [hₜ₋₁, xₜ] + bc)
+    </div>
+
+    <h3>Output gate (oₜ)</h3>
+    <p>
+      Decide o que <em>expor</em> como saída/estado oculto. Combina-se com a
+      esteira passada por tanh.
+    </p>
+    <div class="formula">
+      oₜ = σ(Wo · [hₜ₋₁, xₜ] + bo)
+    </div>
+
+    <div class="analogy">
+      <span class="tag">Analogia · reunião de planejamento</span>
+      <p>
+        Numa reunião de planejamento de produto, há três decisões a cada
+        agenda: <em>"o que deixar de lado dos planos antigos?"</em> (forget),
+        <em>"o que adicionar de novo?"</em> (input + candidato),
+        <em>"o que comunicar agora ao time?"</em> (output). A LSTM tem essas
+        três decisões em cada passo de tempo.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ ANATOMIA ============ -->
+  <section class="block" id="anatomia">
+    <h2><span class="num">4</span> Anatomia completa da célula LSTM</h2>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 380" xmlns="http://www.w3.org/2000/svg">
+        <!-- esteira -->
+        <line x1="20" y1="100" x2="740" y2="100" stroke="#4fd1c5" stroke-width="5"/>
+        <text x="10" y="95" fill="#4fd1c5" font-weight="700">c_{t-1}</text>
+        <text x="700" y="85" fill="#4fd1c5" font-weight="700">cₜ</text>
+
+        <!-- forget -->
+        <circle cx="200" cy="100" r="22" fill="#ff7a90"/>
+        <text x="200" y="105" text-anchor="middle" fill="#fff" font-weight="700">×</text>
+
+        <rect x="160" y="230" width="80" height="40" rx="6" fill="#ff7a90" opacity="0.6"/>
+        <text x="200" y="255" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">σ (forget)</text>
+        <path d="M200 230 L200 125" stroke="#ff7a90" stroke-width="2" marker-end="url(#arrL)"/>
+        <text x="220" y="190" fill="#ff7a90" class="svg-label">fₜ</text>
+
+        <!-- input + candidate -->
+        <circle cx="380" cy="100" r="22" fill="#ffb86b"/>
+        <text x="380" y="105" text-anchor="middle" fill="#fff" font-weight="700">+</text>
+
+        <!-- multiplicação para input -->
+        <circle cx="380" cy="180" r="16" fill="#ffb86b" opacity="0.6"/>
+        <text x="380" y="185" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">×</text>
+
+        <rect x="320" y="240" width="60" height="40" rx="6" fill="#ffb86b" opacity="0.6"/>
+        <text x="350" y="265" text-anchor="middle" fill="#fff" font-size="12">σ (input)</text>
+        <rect x="390" y="240" width="60" height="40" rx="6" fill="#ffb86b" opacity="0.6"/>
+        <text x="420" y="265" text-anchor="middle" fill="#fff" font-size="12">tanh (c̃)</text>
+
+        <path d="M350 240 L375 195" stroke="#ffb86b" stroke-width="2" marker-end="url(#arrL)"/>
+        <path d="M420 240 L385 195" stroke="#ffb86b" stroke-width="2" marker-end="url(#arrL)"/>
+        <path d="M380 165 L380 125" stroke="#ffb86b" stroke-width="2" marker-end="url(#arrL)"/>
+
+        <!-- output -->
+        <circle cx="600" cy="220" r="20" fill="#b07aff" opacity="0.9"/>
+        <text x="600" y="225" text-anchor="middle" fill="#fff" font-weight="700">×</text>
+        <rect x="540" y="280" width="80" height="40" rx="6" fill="#b07aff" opacity="0.6"/>
+        <text x="580" y="305" text-anchor="middle" fill="#fff" font-size="12">σ (output)</text>
+        <path d="M580 280 L595 240" stroke="#b07aff" stroke-width="2" marker-end="url(#arrL)"/>
+        <!-- tanh of c -->
+        <rect x="640" y="130" width="60" height="30" rx="6" fill="#4fd1c5" opacity="0.6"/>
+        <text x="670" y="150" text-anchor="middle" fill="#0b1020" font-size="12">tanh</text>
+        <path d="M670 130 L670 110" stroke="#4fd1c5" stroke-width="2"/>
+        <path d="M650 160 L620 215" stroke="#4fd1c5" stroke-width="2" marker-end="url(#arrL)"/>
+
+        <!-- saída h -->
+        <path d="M620 220 L740 220" stroke="#4fd1c5" stroke-width="2" marker-end="url(#arrL)"/>
+        <text x="750" y="225" fill="#4fd1c5" font-weight="700">hₜ</text>
+
+        <!-- entradas -->
+        <rect x="60" y="310" width="640" height="14" fill="#7aa2ff" opacity="0.15"/>
+        <text x="380" y="350" text-anchor="middle" fill="#7aa2ff" font-weight="700">[h_{t-1}, xₜ] — entrada concatenada</text>
+
+        <defs>
+          <marker id="arrL" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#e9ecf8"/></marker>
+        </defs>
+      </svg>
+      <div class="caption">Diagrama detalhado de uma célula LSTM. Esteira azul = memória cₜ. Três portões coloridos com suas operações específicas.</div>
+    </div>
+  </section>
+
+  <!-- ============ FLUXO ============ -->
+  <section class="block" id="fluxo">
+    <h2><span class="num">5</span> O fluxo de informação passo a passo</h2>
+
+    <ol>
+      <li><strong>Recebe</strong> hₜ₋₁ (estado anterior), cₜ₋₁ (memória anterior), xₜ (entrada atual).</li>
+      <li><strong>Concatena</strong> hₜ₋₁ e xₜ para formar a entrada dos portões.</li>
+      <li><strong>Forget</strong>: calcula fₜ; multiplica cₜ₋₁ elemento a elemento por fₜ. O que tinha fₜ próximo de 0 é esquecido.</li>
+      <li><strong>Input + candidate</strong>: calcula iₜ e c̃ₜ; produto iₜ ⊙ c̃ₜ é o "novo conteúdo" a adicionar.</li>
+      <li><strong>Atualiza a esteira</strong>: cₜ = fₜ ⊙ cₜ₋₁ + iₜ ⊙ c̃ₜ.</li>
+      <li><strong>Output</strong>: calcula oₜ; a nova "ativação" hₜ = oₜ ⊙ tanh(cₜ).</li>
+      <li><strong>Saída</strong>: hₜ vai para a próxima célula (e também para a camada superior, se houver).</li>
+    </ol>
+  </section>
+
+  <!-- ============ EQUAÇÕES ============ -->
+  <section class="block" id="equacoes">
+    <h2><span class="num">6</span> Equações em detalhe</h2>
+
+    <div class="formula">
+      <div class="fname">As 6 equações da LSTM</div>
+      fₜ  = σ(Wf · [hₜ₋₁, xₜ] + bf)         ← forget gate<br>
+      iₜ  = σ(Wi · [hₜ₋₁, xₜ] + bi)         ← input gate<br>
+      c̃ₜ = tanh(Wc · [hₜ₋₁, xₜ] + bc)      ← candidato<br>
+      cₜ  = fₜ ⊙ cₜ₋₁ + iₜ ⊙ c̃ₜ           ← nova memória<br>
+      oₜ  = σ(Wo · [hₜ₋₁, xₜ] + bo)         ← output gate<br>
+      hₜ  = oₜ ⊙ tanh(cₜ)                   ← novo estado oculto
+    </div>
+
+    <p>
+      ⊙ representa multiplicação <em>elemento a elemento</em> (Hadamard product),
+      <em>não</em> multiplicação de matrizes.
+    </p>
+
+    <h3>Quantidade de parâmetros</h3>
+    <p>
+      Se o estado oculto tem H dimensões e a entrada tem N dimensões, cada
+      portão tem uma matriz de tamanho H × (H + N) e um vetor de bias H.
+      São <strong>4 matrizes</strong> (forget, input, candidato, output). Total
+      por célula:
+    </p>
+    <div class="formula">
+      4 × (H × (H+N) + H) = 4H(H + N + 1) parâmetros
+    </div>
+    <p>
+      Para uma LSTM com H=512 e N=300 (embedding típico): aproximadamente
+      1,7 milhões de parâmetros por camada.
+    </p>
+  </section>
+
+  <!-- ============ GRU ============ -->
+  <section class="block" id="gru">
+    <h2><span class="num">7</span> GRU: a versão simplificada</h2>
+
+    <p>
+      Em 2014, <strong>Kyunghyun Cho</strong> e colegas (incluindo Bengio)
+      propuseram a <strong>Gated Recurrent Unit (GRU)</strong>: uma versão mais
+      enxuta da LSTM. Principais simplificações:
+    </p>
+    <ul>
+      <li>Funde o forget e o input em um único <strong>update gate (zₜ)</strong>.</li>
+      <li>Funde estado oculto e célula de memória — só há h (não há c separada).</li>
+      <li>Introduz um <strong>reset gate (rₜ)</strong> que decide o quanto do estado anterior usar.</li>
+    </ul>
+
+    <div class="formula">
+      <div class="fname">Equações da GRU</div>
+      zₜ  = σ(Wz · [hₜ₋₁, xₜ])           ← update gate<br>
+      rₜ  = σ(Wr · [hₜ₋₁, xₜ])           ← reset gate<br>
+      h̃ₜ = tanh(W · [rₜ ⊙ hₜ₋₁, xₜ])    ← candidato<br>
+      hₜ  = (1 − zₜ) ⊙ hₜ₋₁ + zₜ ⊙ h̃ₜ
+    </div>
+
+    <h3>LSTM vs. GRU</h3>
+    <table class="compare">
+      <thead><tr><th>Aspecto</th><th>LSTM</th><th>GRU</th></tr></thead>
+      <tbody>
+        <tr><td>Portões</td><td>3 (forget, input, output)</td><td>2 (update, reset)</td></tr>
+        <tr><td>Estado</td><td>2 vetores (h, c)</td><td>1 vetor (h)</td></tr>
+        <tr><td>Parâmetros</td><td>4 × H(H+N+1)</td><td>3 × H(H+N+1)</td></tr>
+        <tr><td>Treino</td><td>Mais lento</td><td>~25% mais rápido</td></tr>
+        <tr><td>Performance</td><td>Levemente melhor em séries longas</td><td>Equivalente em muitas tarefas</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      Empiricamente, GRU e LSTM se equivalem na maioria das tarefas. GRU é
+      preferida quando o treino precisa ser rápido; LSTM, quando a tarefa
+      envolve dependências muito longas.
+    </p>
+  </section>
+
+  <!-- ============ PEEPHOLE ============ -->
+  <section class="block" id="peephole">
+    <h2><span class="num">8</span> Variantes: peephole, projection, etc.</h2>
+
+    <h3>Peephole LSTM (Gers &amp; Schmidhuber, 2000)</h3>
+    <p>
+      Os portões "espiam" a célula de memória cₜ diretamente. Melhora o controle
+      temporal preciso (importante em problemas como contagem de batidas musicais).
+    </p>
+
+    <h3>Coupled forget/input</h3>
+    <p>
+      Força fₜ = 1 − iₜ. Em vez de decidir separadamente o que esquecer e o que
+      adicionar, decide uma única coisa: <em>esquecer X e adicionar 1−X no mesmo
+      slot</em>. Menos parâmetros, performance similar.
+    </p>
+
+    <h3>Projection LSTM</h3>
+    <p>
+      Adiciona uma projeção linear na saída para reduzir dimensionalidade,
+      usado em sistemas de reconhecimento de fala em larga escala (Sak et al., 2014).
+    </p>
+
+    <h3>Stacked / Deep LSTM</h3>
+    <p>
+      Várias LSTMs empilhadas — saída de uma é entrada da próxima. Camada inferior
+      captura padrões finos; camada superior, padrões grossos.
+    </p>
+
+    <h3>Bi-LSTM</h3>
+    <p>
+      Como BRNN, mas com células LSTM. Estado da arte em PLN clássico (NER,
+      POS, parsing) antes dos Transformers.
+    </p>
+  </section>
+
+  <!-- ============ DICAS ============ -->
+  <section class="block" id="dicas">
+    <h2><span class="num">9</span> Dicas práticas de treinamento</h2>
+
+    <ul>
+      <li><strong>Inicialize o bias do forget gate com 1 (ou maior)</strong> — assim a rede começa "lembrando tudo" e aprende a esquecer.</li>
+      <li><strong>Use gradient clipping</strong> (norm ≤ 5 ou 10) para evitar exploding gradients.</li>
+      <li><strong>Dropout só nas conexões verticais</strong> (entre camadas), não nas recorrentes — variantes específicas (recurrent dropout, zoneout) servem para isso.</li>
+      <li><strong>Use Adam ou RMSProp</strong> — SGD puro tende a oscilar em LSTMs.</li>
+      <li><strong>Batch size pequeno-médio</strong> (32-128) costuma funcionar melhor.</li>
+      <li><strong>Inicialização ortogonal das matrizes recorrentes</strong> ajuda a estabilizar.</li>
+      <li><strong>Truncated BPTT</strong> com janelas de 100-200 passos para sequências longas.</li>
+    </ul>
+
+    <div class="tip">
+      <span class="tag">Dica de ouro</span>
+      <p>
+        Comece sempre com uma LSTM com 1-2 camadas e H=128 ou 256. Aumente só
+        se necessário. A maioria dos problemas de PLN pré-Transformer foi
+        resolvida com modelos surpreendentemente pequenos.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ APLICAÇÕES ============ -->
+  <section class="block" id="aplicacoes">
+    <h2><span class="num">10</span> A era LSTM (2014-2017)</h2>
+
+    <p>
+      Entre 2014 e 2017, a LSTM dominou praticamente toda a NLP comercial e
+      muitas aplicações de áudio e séries temporais:
+    </p>
+
+    <ul>
+      <li><strong>Google Translate</strong> migrou para LSTM em 2016 (GNMT — Google Neural Machine Translation). Reduziu o erro de tradução em ~60%.</li>
+      <li><strong>Apple Siri, Amazon Alexa, Google Assistant</strong> usavam LSTMs em reconhecimento de fala.</li>
+      <li><strong>Microsoft</strong> alcançou paridade humana em reconhecimento de fala em 2017 usando deep LSTMs.</li>
+      <li><strong>Baidu DeepSpeech</strong> — modelo end-to-end de fala usando GRUs.</li>
+      <li><strong>Google Smart Reply</strong> (sugestões automáticas no Gmail) — LSTM seq2seq.</li>
+      <li><strong>AlphaGo</strong> usou LSTMs em alguns componentes de avaliação.</li>
+      <li><strong>OpenAI GPT-1</strong> foi <em>quase</em> uma LSTM — mas eles optaram por Transformer no fim.</li>
+      <li><strong>Detecção de anomalias</strong> em telemetria de máquinas industriais.</li>
+      <li><strong>Modelagem financeira</strong> — previsão de preços de ativos, FX.</li>
+    </ul>
+
+    <h3>O paper "GNMT" da Google (2016)</h3>
+    <p>
+      Wu et al., "Google's Neural Machine Translation System", descreve um sistema
+      com 8 camadas de LSTM no encoder + 8 no decoder + atenção. Treinava por
+      semanas em 96 GPUs. Marcou a virada do Google Translate. O paper se tornou
+      uma referência para sistemas de PLN em produção.
+    </p>
+  </section>
+
+  <!-- ============ HOJE ============ -->
+  <section class="block" id="hoje">
+    <h2><span class="num">11</span> A LSTM hoje: ainda viva</h2>
+
+    <p>
+      Os Transformers tomaram o trono em 2017-2018. Mas a LSTM <em>não morreu</em>.
+      Ela continua sendo a escolha certa em vários cenários:
+    </p>
+
+    <ul>
+      <li><strong>Dispositivos com pouca memória</strong> — LSTM tem complexidade O(n) em sequência, enquanto Transformer tem O(n²).</li>
+      <li><strong>Sequências muito longas</strong> com baixa memória — séries temporais industriais com milhares de pontos.</li>
+      <li><strong>Streaming</strong> — LSTM processa um token por vez, ideal para áudio em tempo real.</li>
+      <li><strong>Baselines</strong> — em pesquisa, LSTMs ainda são comparações obrigatórias.</li>
+    </ul>
+
+    <h3>O renascimento: xLSTM (2024)</h3>
+    <p>
+      Em 2024, o mesmo Sepp Hochreiter publicou "xLSTM: Extended Long Short-Term
+      Memory", uma versão modernizada com paralelização parcial e gating
+      exponencial, mostrando que LSTMs ainda podem competir com Transformers em
+      modelagem de linguagem.
+    </p>
+
+    <h3>State Space Models (Mamba, S4)</h3>
+    <p>
+      Modelos como S4 (2021) e Mamba (2023) podem ser vistos como descendentes
+      espirituais das LSTMs — recorrência linear com paralelização eficiente.
+      Estão se mostrando competitivos em sequências muito longas (genômica,
+      áudio).
+    </p>
+  </section>
+
+  <!-- ============ IMPL ============ -->
+  <section class="block" id="impl">
+    <h2><span class="num">12</span> Implementações</h2>
+
+    <div class="impl">
+      <div class="iname">PyTorch — <code>nn.LSTM</code> e <code>nn.GRU</code></div>
+      <div class="idesc">Implementação altamente otimizada usando cuDNN. Suporta bidirecional, multi-camada e dropout entre camadas.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">TensorFlow / Keras — <code>tf.keras.layers.LSTM</code> e <code>GRU</code></div>
+      <div class="idesc">API limpa com return_sequences e return_state.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">cuDNN LSTM</div>
+      <div class="idesc">Implementação otimizada da NVIDIA. 5-10× mais rápida que implementações naive em CUDA.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">AllenNLP</div>
+      <div class="idesc">Framework de PLN com módulos avançados de LSTM (ELMo, BiLM).</div>
+    </div>
+    <div class="impl">
+      <div class="iname">DeepSpeech (Mozilla)</div>
+      <div class="idesc">Reconhecimento de fala open-source baseado em GRUs.</div>
+    </div>
+  </section>
+
+  <!-- ============ ARTIGOS ============ -->
+  <section class="block" id="artigos">
+    <h2><span class="num">13</span> Artigos seminais</h2>
+    <div class="papers">
+      <div class="paper">
+        <span class="pyear">1997</span><span class="ptitle">Long Short-Term Memory</span><br>
+        <span class="pauthors">Sepp Hochreiter, Jürgen Schmidhuber — Neural Computation</span>
+        <div class="psumm">O artigo fundador da LSTM. Introduz a célula de memória e os portões.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2000</span><span class="ptitle">Learning to Forget: Continual Prediction with LSTM</span><br>
+        <span class="pauthors">Felix Gers, Jürgen Schmidhuber, Fred Cummins — Neural Computation</span>
+        <div class="psumm">Adiciona o forget gate à LSTM original (que não tinha!). Ficou conhecido como "vanilla LSTM".</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2000</span><span class="ptitle">Recurrent nets that time and count</span><br>
+        <span class="pauthors">Felix Gers, Jürgen Schmidhuber — IJCNN</span>
+        <div class="psumm">Introduz peephole connections.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2013</span><span class="ptitle">Generating Sequences With Recurrent Neural Networks</span><br>
+        <span class="pauthors">Alex Graves — arXiv</span>
+        <div class="psumm">Demonstra LSTMs gerando texto, escrita à mão e sequências complexas.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2014</span><span class="ptitle">Learning Phrase Representations using RNN Encoder-Decoder for Statistical Machine Translation</span><br>
+        <span class="pauthors">Kyunghyun Cho et al. — EMNLP</span>
+        <div class="psumm">Introduz a GRU. Coloca seq2seq em prática.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2014</span><span class="ptitle">Empirical Evaluation of Gated Recurrent Neural Networks on Sequence Modeling</span><br>
+        <span class="pauthors">Junyoung Chung et al. — arXiv</span>
+        <div class="psumm">Compara LSTM e GRU em várias tarefas. Conclui que são equivalentes.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2015</span><span class="ptitle">LSTM: A Search Space Odyssey</span><br>
+        <span class="pauthors">Klaus Greff, Rupesh Srivastava, Jan Koutník, Bas Steunebrink, Jürgen Schmidhuber — IEEE Trans. NN</span>
+        <div class="psumm">Avaliação sistemática de variantes de LSTM. Mostra que vanilla LSTM é a melhor escolha.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2016</span><span class="ptitle">Google's Neural Machine Translation System (GNMT)</span><br>
+        <span class="pauthors">Yonghui Wu et al. — Google</span>
+        <div class="psumm">Sistema de produção do Google Translate. 8 camadas LSTM + atenção.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2024</span><span class="ptitle">xLSTM: Extended Long Short-Term Memory</span><br>
+        <span class="pauthors">Maximilian Beck, Korbinian Pöppel, Sepp Hochreiter et al.</span>
+        <div class="psumm">Versão modernizada da LSTM com paralelização e gating exponencial.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ APROFUNDAR ============ -->
+  <section class="block" id="aprofundar">
+    <h2><span class="num">14</span> Para se aprofundar</h2>
+
+    <ul>
+      <li><strong>Christopher Olah — "Understanding LSTMs" (2015)</strong>: o post mais famoso da internet sobre LSTM. Leitura obrigatória.</li>
+      <li><strong>Andrej Karpathy — "The Unreasonable Effectiveness of RNNs" (2015)</strong>: complementa Olah com demos.</li>
+      <li><strong>Goodfellow et al. — Deep Learning, cap. 10</strong>: tratamento formal.</li>
+      <li><strong>CS224n (Stanford)</strong>: aulas 5-7 cobrem RNN/LSTM/Seq2Seq.</li>
+    </ul>
+
+    <p>
+      Próximo passo: a LSTM domou sequências, mas ainda era sequencial. O
+      <a href="seq2seq.html">Seq2Seq com atenção</a> introduziu uma ideia que,
+      em 2017, levaria ao <a href="transformer.html">Transformer</a>.
+    </p>
+  </section>
+
+  <a href="autoencoder.html" class="deeplink">
+    <span class="arrow">→</span>
+    <span class="dt">Próxima arquitetura</span>
+    <span class="dn">Autoencoders e VAE</span>
+  </a>
+
+  <footer>
+    <p>Página detalhada · LSTM e GRU · Parte do projeto <a href="index.html">Histórico de Evolução dos Modelos de IA</a></p>
+  </footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transformer — Página Detalhada</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <nav class="topnav">
+    <a href="index.html">← Voltar ao índice</a>
+    <span class="crumbs">Arquitetura · 2017</span>
+  </nav>
+
+  <header class="hero">
+    <div class="eyebrow">A arquitetura que mudou tudo · 2017</div>
+    <h1>Transformer</h1>
+    <p class="lead">
+      "Attention is All You Need" foi mais que um título provocativo: foi uma
+      aposta que se provou correta. Ao remover a recorrência e construir um
+      modelo puramente baseado em atenção, oito pesquisadores do Google
+      destravaram a era dos LLMs. Hoje, praticamente toda IA moderna —
+      ChatGPT, Claude, Gemini, DALL-E, AlphaFold — é alguma variação do
+      Transformer.
+    </p>
+  </header>
+
+  <div class="toc">
+    <h4>Sumário</h4>
+    <ol>
+      <li><a href="#contexto">A pergunta que mudou a IA</a></li>
+      <li><a href="#visao">Visão geral do Transformer</a></li>
+      <li><a href="#embed">Embeddings e tokenização</a></li>
+      <li><a href="#pos">Positional encoding</a></li>
+      <li><a href="#attention">Self-attention: o coração do modelo</a></li>
+      <li><a href="#qkv">Q, K, V em detalhe</a></li>
+      <li><a href="#multihead">Multi-head attention</a></li>
+      <li><a href="#ffn">Feed-forward por posição</a></li>
+      <li><a href="#norm">Residual + LayerNorm</a></li>
+      <li><a href="#encoder">O encoder completo</a></li>
+      <li><a href="#decoder">O decoder e a masked attention</a></li>
+      <li><a href="#cross">Cross-attention</a></li>
+      <li><a href="#complexidade">Complexidade e limites</a></li>
+      <li><a href="#variantes">Variantes modernas</a></li>
+      <li><a href="#impl">Implementações</a></li>
+      <li><a href="#artigos">Artigos seminais</a></li>
+      <li><a href="#aprofundar">Para se aprofundar</a></li>
+    </ol>
+  </div>
+
+  <!-- ============ CONTEXTO ============ -->
+  <section class="block" id="contexto">
+    <h2><span class="num">1</span> A pergunta que mudou a IA</h2>
+
+    <p>
+      Em 2017, oito pesquisadores do Google Brain (Ashish Vaswani, Noam Shazeer,
+      Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan Gomez, Łukasz Kaiser e
+      Illia Polosukhin) submeteram um paper à NeurIPS com um título audacioso:
+      <em>"Attention is All You Need"</em>.
+    </p>
+
+    <p>
+      A pergunta provocativa: <em>"Se a atenção é a parte mais útil das LSTMs em
+      seq2seq, por que precisamos da recorrência?"</em>. Eles propuseram remover
+      LSTMs/GRUs completamente e construir o modelo só com camadas de atenção
+      e MLPs.
+    </p>
+
+    <h3>Os problemas das RNNs que o Transformer resolveu</h3>
+    <ul>
+      <li><strong>Sequencialidade</strong> — RNNs processam um token por vez. Impossível paralelizar no tempo. Treino lento.</li>
+      <li><strong>Memória de longo prazo</strong> — mesmo LSTMs degradam em sequências de milhares de tokens.</li>
+      <li><strong>Caminho longo de gradiente</strong> — para conectar o token 1 ao token 1000, a informação precisa fluir por 999 estados.</li>
+    </ul>
+
+    <h3>Os resultados</h3>
+    <ul>
+      <li>Tradução EN-DE (WMT 2014): 28,4 BLEU — melhor que LSTMs.</li>
+      <li>Treino 8× mais rápido em GPUs equivalentes.</li>
+      <li>Escalabilidade dramaticamente melhor.</li>
+    </ul>
+
+    <p>
+      Em retrospecto, "Attention is All You Need" tornou-se um dos papers mais
+      influentes da história da ciência da computação. Citações? Mais de 100.000
+      em 2024.
+    </p>
+  </section>
+
+  <!-- ============ VISÃO ============ -->
+  <section class="block" id="visao">
+    <h2><span class="num">2</span> Visão geral do Transformer</h2>
+
+    <p>
+      O Transformer original é um modelo <strong>encoder-decoder</strong> para
+      tradução. Ele tem:
+    </p>
+    <ul>
+      <li><strong>Encoder</strong>: N camadas idênticas que processam a sequência fonte em paralelo.</li>
+      <li><strong>Decoder</strong>: N camadas idênticas que geram a sequência alvo, uma posição por vez.</li>
+    </ul>
+    <p>
+      No paper original, N=6 (6 camadas em cada lado). Em GPT-3, N=96.
+    </p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 460" xmlns="http://www.w3.org/2000/svg">
+        <!-- Encoder -->
+        <rect x="40" y="40" width="320" height="380" rx="14" fill="#1f2952" stroke="#7aa2ff" stroke-width="2"/>
+        <text x="200" y="30" text-anchor="middle" fill="#7aa2ff" font-weight="700">ENCODER (×N)</text>
+
+        <rect x="80" y="360" width="240" height="40" rx="6" fill="#0f1530" stroke="#4fd1c5"/>
+        <text x="200" y="385" text-anchor="middle" class="svg-text">Embedding + Pos. Encoding</text>
+
+        <rect x="80" y="270" width="240" height="60" rx="6" fill="#b07aff" opacity="0.85"/>
+        <text x="200" y="295" text-anchor="middle" fill="#fff" font-weight="700">Multi-Head</text>
+        <text x="200" y="315" text-anchor="middle" fill="#fff" font-size="12">Self-Attention</text>
+
+        <rect x="80" y="240" width="240" height="20" rx="4" fill="#0a3a36" stroke="#4fd1c5"/>
+        <text x="200" y="255" text-anchor="middle" fill="#4fd1c5" font-size="11">Add &amp; Norm</text>
+
+        <rect x="80" y="150" width="240" height="60" rx="6" fill="#b07aff" opacity="0.85"/>
+        <text x="200" y="175" text-anchor="middle" fill="#fff" font-weight="700">Feed Forward</text>
+        <text x="200" y="195" text-anchor="middle" fill="#fff" font-size="12">(por posição)</text>
+
+        <rect x="80" y="120" width="240" height="20" rx="4" fill="#0a3a36" stroke="#4fd1c5"/>
+        <text x="200" y="135" text-anchor="middle" fill="#4fd1c5" font-size="11">Add &amp; Norm</text>
+
+        <path d="M200 360 L200 330" stroke="#4fd1c5" stroke-width="1.5" marker-end="url(#arrTL)"/>
+        <path d="M200 270 L200 260" stroke="#4fd1c5" stroke-width="1.5" marker-end="url(#arrTL)"/>
+        <path d="M200 240 L200 210" stroke="#4fd1c5" stroke-width="1.5" marker-end="url(#arrTL)"/>
+        <path d="M200 150 L200 140" stroke="#4fd1c5" stroke-width="1.5" marker-end="url(#arrTL)"/>
+        <path d="M200 120 L200 70" stroke="#4fd1c5" stroke-width="1.5" marker-end="url(#arrTL)"/>
+
+        <!-- Decoder -->
+        <rect x="400" y="40" width="320" height="380" rx="14" fill="#1f2952" stroke="#ffb86b" stroke-width="2"/>
+        <text x="560" y="30" text-anchor="middle" fill="#ffb86b" font-weight="700">DECODER (×N)</text>
+
+        <rect x="440" y="360" width="240" height="40" rx="6" fill="#0f1530" stroke="#4fd1c5"/>
+        <text x="560" y="385" text-anchor="middle" class="svg-text">Output embed + Pos.</text>
+
+        <rect x="440" y="290" width="240" height="50" rx="6" fill="#b07aff" opacity="0.85"/>
+        <text x="560" y="320" text-anchor="middle" fill="#fff" font-weight="700">Masked Self-Attn</text>
+
+        <rect x="440" y="265" width="240" height="20" rx="4" fill="#0a3a36" stroke="#4fd1c5"/>
+        <text x="560" y="280" text-anchor="middle" fill="#4fd1c5" font-size="11">Add &amp; Norm</text>
+
+        <rect x="440" y="200" width="240" height="50" rx="6" fill="#b07aff" opacity="0.85"/>
+        <text x="560" y="220" text-anchor="middle" fill="#fff" font-weight="700">Cross-Attention</text>
+        <text x="560" y="240" text-anchor="middle" fill="#fff" font-size="11">(olha o encoder)</text>
+
+        <rect x="440" y="175" width="240" height="20" rx="4" fill="#0a3a36" stroke="#4fd1c5"/>
+        <text x="560" y="190" text-anchor="middle" fill="#4fd1c5" font-size="11">Add &amp; Norm</text>
+
+        <rect x="440" y="110" width="240" height="50" rx="6" fill="#b07aff" opacity="0.85"/>
+        <text x="560" y="140" text-anchor="middle" fill="#fff" font-weight="700">Feed Forward</text>
+
+        <rect x="440" y="85" width="240" height="20" rx="4" fill="#0a3a36" stroke="#4fd1c5"/>
+        <text x="560" y="100" text-anchor="middle" fill="#4fd1c5" font-size="11">Add &amp; Norm</text>
+
+        <!-- cross-attention da encoder -->
+        <path d="M360 100 Q 400 200 440 225" stroke="#ffb86b" stroke-width="2" stroke-dasharray="5 3" fill="none" marker-end="url(#arrTL2)"/>
+        <text x="385" y="170" fill="#ffb86b" font-size="11">K, V</text>
+
+        <!-- saída -->
+        <path d="M560 85 L560 50" stroke="#4fd1c5" stroke-width="2" marker-end="url(#arrTL)"/>
+        <text x="560" y="40" text-anchor="middle" fill="#e9ecf8" font-size="12">Softmax → próxima palavra</text>
+
+        <defs>
+          <marker id="arrTL"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#4fd1c5"/></marker>
+          <marker id="arrTL2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#ffb86b"/></marker>
+        </defs>
+      </svg>
+      <div class="caption">Arquitetura completa do Transformer (Vaswani et al., 2017). Encoder à esquerda, decoder à direita, conectados por cross-attention.</div>
+    </div>
+  </section>
+
+  <!-- ============ EMBED ============ -->
+  <section class="block" id="embed">
+    <h2><span class="num">3</span> Embeddings e tokenização</h2>
+
+    <p>
+      Antes do Transformer, precisamos converter texto em números:
+    </p>
+
+    <h3>Tokenização</h3>
+    <p>
+      Divida o texto em <strong>tokens</strong> — unidades menores que palavras
+      mas maiores que caracteres. O Transformer usa <em>subword tokenization</em>
+      (BPE, WordPiece, SentencePiece):
+    </p>
+    <ul>
+      <li>Palavras comuns viram um único token: "the", "and", "is".</li>
+      <li>Palavras raras são divididas: "transformers" → "trans" + "former" + "s".</li>
+      <li>Caracteres raros sempre existem como tokens individuais.</li>
+    </ul>
+    <p>
+      GPT-3 usa ~50.000 tokens. Modelos modernos podem ter 100.000+.
+    </p>
+
+    <h3>Embedding</h3>
+    <p>
+      Cada token vira um <strong>vetor denso</strong> de dimensão d (no paper
+      original, d=512). Isso é uma tabela lookup com tamanho [vocab_size, d].
+      Esses vetores são aprendidos durante o treino.
+    </p>
+
+    <div class="analogy">
+      <span class="tag">Analogia · coordenadas no espaço de significado</span>
+      <p>
+        Imagine que cada palavra é um ponto em um espaço de 512 dimensões. Palavras
+        semelhantes ficam próximas; opostas, distantes. A direção "rei" − "homem"
+        + "mulher" ≈ "rainha". O embedding é a função que mapeia tokens a esse
+        espaço.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ POS ============ -->
+  <section class="block" id="pos">
+    <h2><span class="num">4</span> Positional encoding</h2>
+
+    <p>
+      O Transformer não tem recorrência nem convolução — então, à primeira
+      vista, não sabe a ordem das palavras. "O cachorro mordeu o homem" e
+      "O homem mordeu o cachorro" teriam os mesmos tokens, processados em paralelo.
+    </p>
+
+    <p>
+      Solução: <strong>adicionar um vetor de posição</strong> a cada embedding.
+      Esse vetor codifica "este é o token 1", "este é o token 2", etc.
+    </p>
+
+    <h3>Senoidal (paper original)</h3>
+    <div class="formula">
+      PE(pos, 2i)   = sin(pos / 10000^(2i/d))<br>
+      PE(pos, 2i+1) = cos(pos / 10000^(2i/d))
+    </div>
+    <p>
+      Cada dimensão é uma senoide de uma frequência diferente. Vantagens:
+    </p>
+    <ul>
+      <li>Não precisa ser aprendida.</li>
+      <li>Generaliza para sequências mais longas que vistas no treino.</li>
+      <li>Permite ao modelo aprender posições relativas (PE(pos+k) é função linear de PE(pos)).</li>
+    </ul>
+
+    <h3>Aprendido</h3>
+    <p>
+      Em vez de senoides fixas, aprender um vetor de posição para cada posição
+      (até um comprimento máximo). Usado pelo BERT e GPT.
+    </p>
+
+    <h3>Posições relativas</h3>
+    <p>
+      Variantes modernas (T5, RoPE em LLaMA) codificam <em>distância entre
+      tokens</em> em vez de posição absoluta. Geralmente melhora generalização
+      para sequências longas.
+    </p>
+  </section>
+
+  <!-- ============ ATTENTION ============ -->
+  <section class="block" id="attention">
+    <h2><span class="num">5</span> Self-attention: o coração do modelo</h2>
+
+    <p>
+      Self-attention é a operação que dá ao Transformer seu poder. Cada token
+      olha para todos os outros tokens (incluindo a si mesmo) e produz uma
+      nova representação como média ponderada.
+    </p>
+
+    <div class="analogy">
+      <span class="tag">Analogia · mesa redonda de tradutores</span>
+      <p>
+        Numa RNN, cada tradutor só conversa com o vizinho mais próximo, e a
+        mensagem passa de um a um. Numa self-attention, todos os tradutores
+        sentam numa mesa redonda. Cada um <em>pergunta a todos os outros ao
+        mesmo tempo</em>: "Qual de vocês me ajuda a entender meu trecho?"
+        Os outros respondem com suas informações; o tradutor faz uma média
+        ponderada das respostas. Isso acontece em paralelo, para todos os
+        tradutores simultaneamente.
+      </p>
+    </div>
+
+    <h3>A mecânica em alto nível</h3>
+    <ol>
+      <li>Cada token gera três vetores: Query (Q), Key (K), Value (V).</li>
+      <li>Para token i, computa-se a similaridade entre Qᵢ e cada Kⱼ.</li>
+      <li>Essas similaridades viram pesos (softmax).</li>
+      <li>O novo vetor de i é a soma ponderada dos Vⱼ.</li>
+    </ol>
+  </section>
+
+  <!-- ============ QKV ============ -->
+  <section class="block" id="qkv">
+    <h2><span class="num">6</span> Q, K, V em detalhe</h2>
+
+    <p>
+      Para cada token de entrada xᵢ (vetor de dimensão d), três projeções
+      lineares produzem três novos vetores:
+    </p>
+    <div class="formula">
+      Qᵢ = Wq · xᵢ<br>
+      Kᵢ = Wk · xᵢ<br>
+      Vᵢ = Wv · xᵢ
+    </div>
+
+    <p>
+      Wq, Wk e Wv são matrizes aprendidas. Os vetores Q, K, V geralmente têm
+      a mesma dimensão que xᵢ.
+    </p>
+
+    <div class="analogy">
+      <span class="tag">Analogia · banco de dados</span>
+      <p>
+        Pense num banco de dados:
+      </p>
+      <ul>
+        <li><strong>Query (Q)</strong> = pergunta que você quer fazer.</li>
+        <li><strong>Key (K)</strong> = o "índice" de cada registro do banco.</li>
+        <li><strong>Value (V)</strong> = o conteúdo associado àquela key.</li>
+      </ul>
+      <p>
+        Você compara sua query com todas as keys. As keys mais similares
+        têm peso maior. Você retorna uma combinação ponderada dos values
+        correspondentes.
+      </p>
+    </div>
+
+    <h3>A equação completa</h3>
+    <div class="formula">
+      <div class="fname">Scaled Dot-Product Attention</div>
+      Attention(Q, K, V) = softmax( (Q · Kᵀ) / √dₖ ) · V
+    </div>
+
+    <h3>Por quê o √dₖ?</h3>
+    <p>
+      Sem o escalonamento, o produto interno entre Q e K cresce com a dimensão.
+      Valores grandes saturam o softmax (uma posição vira ≈1, todas as outras
+      ≈0). Dividir por √dₖ mantém a variância estável.
+    </p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg">
+        <!-- input tokens -->
+        <text x="380" y="20" text-anchor="middle" class="svg-label">"O gato está feliz"</text>
+
+        <!-- Q K V projections -->
+        <g transform="translate(40,50)">
+          <rect x="0" y="0" width="60" height="40" fill="#7aa2ff" opacity="0.8"/>
+          <text x="30" y="25" text-anchor="middle" fill="#fff" font-weight="700">Q</text>
+          <text x="30" y="60" text-anchor="middle" class="svg-label">queries</text>
+        </g>
+        <g transform="translate(140,50)">
+          <rect x="0" y="0" width="60" height="40" fill="#b07aff" opacity="0.8"/>
+          <text x="30" y="25" text-anchor="middle" fill="#fff" font-weight="700">K</text>
+          <text x="30" y="60" text-anchor="middle" class="svg-label">keys</text>
+        </g>
+        <g transform="translate(240,50)">
+          <rect x="0" y="0" width="60" height="40" fill="#4fd1c5" opacity="0.8"/>
+          <text x="30" y="25" text-anchor="middle" fill="#0b1020" font-weight="700">V</text>
+          <text x="30" y="60" text-anchor="middle" class="svg-label">values</text>
+        </g>
+
+        <!-- matriz de scores -->
+        <text x="500" y="40" text-anchor="middle" fill="#e9ecf8" font-weight="700">Q · Kᵀ / √d</text>
+        <g transform="translate(420,60)">
+          <rect x="0"  y="0"  width="40" height="40" fill="#ffb86b" opacity="0.3"/>
+          <rect x="40" y="0"  width="40" height="40" fill="#ffb86b" opacity="0.5"/>
+          <rect x="80" y="0"  width="40" height="40" fill="#ffb86b" opacity="0.2"/>
+          <rect x="120" y="0" width="40" height="40" fill="#ffb86b" opacity="0.1"/>
+          <rect x="0"  y="40" width="40" height="40" fill="#ffb86b" opacity="0.5"/>
+          <rect x="40" y="40" width="40" height="40" fill="#ffb86b" opacity="0.9"/>
+          <rect x="80" y="40" width="40" height="40" fill="#ffb86b" opacity="0.3"/>
+          <rect x="120" y="40" width="40" height="40" fill="#ffb86b" opacity="0.4"/>
+          <rect x="0"  y="80" width="40" height="40" fill="#ffb86b" opacity="0.2"/>
+          <rect x="40" y="80" width="40" height="40" fill="#ffb86b" opacity="0.3"/>
+          <rect x="80" y="80" width="40" height="40" fill="#ffb86b" opacity="0.9"/>
+          <rect x="120" y="80" width="40" height="40" fill="#ffb86b" opacity="0.6"/>
+          <rect x="0"  y="120" width="40" height="40" fill="#ffb86b" opacity="0.1"/>
+          <rect x="40" y="120" width="40" height="40" fill="#ffb86b" opacity="0.3"/>
+          <rect x="80" y="120" width="40" height="40" fill="#ffb86b" opacity="0.5"/>
+          <rect x="120" y="120" width="40" height="40" fill="#ffb86b" opacity="0.95"/>
+        </g>
+
+        <!-- softmax + matmul V -->
+        <text x="380" y="280" text-anchor="middle" fill="#ff7a90">softmax → multiplica por V → saída</text>
+      </svg>
+      <div class="caption">Matriz de atenção: cada linha mostra quanto um token "atende" a cada outro. Cores mais quentes = pesos maiores.</div>
+    </div>
+  </section>
+
+  <!-- ============ MULTIHEAD ============ -->
+  <section class="block" id="multihead">
+    <h2><span class="num">7</span> Multi-head attention</h2>
+
+    <p>
+      Uma única atenção é limitada — ela aprende um único tipo de relação. A
+      ideia do <strong>multi-head</strong>: rodar várias atenções em paralelo,
+      cada uma em um subespaço, e concatenar os resultados.
+    </p>
+
+    <div class="formula">
+      head_i = Attention(Q · Wqᵢ, K · Wkᵢ, V · Wvᵢ)<br>
+      MultiHead(Q, K, V) = Concat(head_1, ..., head_h) · Wo
+    </div>
+
+    <p>
+      O paper usa h=8 cabeças. Cada uma tem dimensão d/h = 64. O custo total
+      é equivalente a uma única atenção de dimensão d — mas com muito mais
+      expressividade.
+    </p>
+
+    <h3>O que cada cabeça aprende</h3>
+    <p>
+      Quando analisamos os pesos de atenção, as cabeças se especializam:
+    </p>
+    <ul>
+      <li>Algumas atendem ao token anterior (capturam dependências locais).</li>
+      <li>Outras atendem a coreferentes ("ele" → o substantivo a que se refere).</li>
+      <li>Outras seguem relações sintáticas (sujeito → verbo, modificador → núcleo).</li>
+      <li>Algumas atendem ao token final ([SEP] ou [EOS]).</li>
+      <li>Outras parecem aprender padrões "redundantes" e podem ser podadas.</li>
+    </ul>
+
+    <div class="analogy">
+      <span class="tag">Analogia · grupo de leitores especializados</span>
+      <p>
+        Imagine que você está estudando um texto difícil e tem 8 especialistas
+        disponíveis: um gramático, um historiador, um filósofo, um cientista,
+        etc. Cada um <em>lê o texto inteiro</em> e te dá seu olhar próprio.
+        Você combina os 8 olhares. Multi-head attention faz isso, mas com a
+        rede aprendendo sozinha o que cada "especialista" deve enfatizar.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ FFN ============ -->
+  <section class="block" id="ffn">
+    <h2><span class="num">8</span> Feed-forward por posição</h2>
+
+    <p>
+      Após a self-attention vem uma MLP simples — mas aplicada
+      <strong>independentemente em cada posição</strong>:
+    </p>
+
+    <div class="formula">
+      FFN(x) = max(0, x · W₁ + b₁) · W₂ + b₂
+    </div>
+
+    <p>
+      Dimensões típicas: W₁ é d × 4d (expansão 4×), W₂ é 4d × d (volta ao tamanho
+      original). No paper original com d=512, isso é 2048 neurônios na camada
+      intermediária.
+    </p>
+
+    <p>
+      Por que isso é importante? Self-attention <em>mistura</em> informação entre
+      posições, mas é linear. A FFN adiciona <em>transformação não-linear</em>
+      em cada posição. As duas operações se complementam.
+    </p>
+
+    <div class="callout">
+      <span class="tag">Onde mora o conhecimento</span>
+      <p>
+        Em LLMs grandes, <strong>~2/3 dos parâmetros estão nas FFNs</strong>.
+        Pesquisas recentes (Geva et al., 2020) sugerem que as FFNs funcionam como
+        "memórias key-value" que armazenam fatos e padrões aprendidos no treino.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ NORM ============ -->
+  <section class="block" id="norm">
+    <h2><span class="num">9</span> Residual + LayerNorm</h2>
+
+    <p>
+      Cada subcamada (atenção e FFN) é envolvida por <strong>conexão residual</strong>
+      e <strong>layer normalization</strong>:
+    </p>
+    <div class="formula">
+      output = LayerNorm(x + SubLayer(x))
+    </div>
+
+    <h3>Conexão residual</h3>
+    <p>
+      Inspirada na ResNet: somar a entrada à saída evita vanishing gradients
+      e facilita o treino de redes profundas. Permite construir Transformers
+      com 96+ camadas.
+    </p>
+
+    <h3>LayerNorm</h3>
+    <p>
+      Normaliza cada vetor de ativação (cada posição independentemente). Mantém
+      a magnitude estável ao longo das camadas. Tem dois parâmetros aprendidos
+      (γ e β) que permitem reescalar.
+    </p>
+
+    <h3>Pre-norm vs. post-norm</h3>
+    <p>
+      O paper original usa post-norm (norm <em>depois</em> da soma). Mas em
+      modelos grandes, pre-norm (norm <em>antes</em> da subcamada) é mais
+      estável. GPT-2/3 usam pre-norm.
+    </p>
+  </section>
+
+  <!-- ============ ENCODER ============ -->
+  <section class="block" id="encoder">
+    <h2><span class="num">10</span> O encoder completo</h2>
+
+    <p>
+      Cada camada do encoder tem duas subcamadas:
+    </p>
+    <ol>
+      <li>Multi-head self-attention.</li>
+      <li>Position-wise feed-forward.</li>
+    </ol>
+    <p>
+      Cada uma com residual + LayerNorm. N camadas empilhadas. Cada token de
+      saída contém informações de todos os outros tokens, modulados pela
+      atenção.
+    </p>
+
+    <p>
+      Modelos só-encoder (BERT, RoBERTa) usam apenas essa parte. São excelentes
+      para tarefas de <em>compreensão</em>: classificação, NER, extração de
+      informação.
+    </p>
+  </section>
+
+  <!-- ============ DECODER ============ -->
+  <section class="block" id="decoder">
+    <h2><span class="num">11</span> O decoder e a masked attention</h2>
+
+    <p>
+      Cada camada do decoder tem <strong>três</strong> subcamadas:
+    </p>
+    <ol>
+      <li><strong>Masked multi-head self-attention</strong> — atende às posições <em>anteriores</em> apenas.</li>
+      <li><strong>Cross-attention</strong> — atende ao encoder.</li>
+      <li><strong>Feed-forward</strong> — como no encoder.</li>
+    </ol>
+
+    <h3>Por que mascarar?</h3>
+    <p>
+      Durante o treino, o decoder vê a sentença alvo inteira. Mas para
+      gerar a palavra na posição i, não pode "olhar para o futuro". A máscara
+      seta os scores das posições i+1, i+2, ... como −∞ antes do softmax,
+      tornando seus pesos zero.
+    </p>
+
+    <div class="formula">
+      <div class="fname">Máscara causal (lower triangular)</div>
+      mask[i,j] = { 0,    se j ≤ i<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;−∞,   se j &gt; i }
+    </div>
+
+    <p>
+      Modelos só-decoder (GPT, LLaMA, Claude) usam apenas o decoder, sem o bloco
+      cross-attention. São <em>autoregressivos</em>: geram um token por vez,
+      cada um condicionado em todos os anteriores.
+    </p>
+  </section>
+
+  <!-- ============ CROSS ============ -->
+  <section class="block" id="cross">
+    <h2><span class="num">12</span> Cross-attention</h2>
+
+    <p>
+      A cross-attention conecta encoder e decoder. Funciona como atenção normal,
+      mas:
+    </p>
+    <ul>
+      <li><strong>Q</strong> vem do decoder.</li>
+      <li><strong>K e V</strong> vêm do encoder.</li>
+    </ul>
+
+    <p>
+      É <em>literalmente</em> a atenção de Bahdanau (2015), só que generalizada.
+      O decoder pergunta; o encoder responde. Permite alinhamentos dinâmicos
+      entre fonte e tradução.
+    </p>
+  </section>
+
+  <!-- ============ COMPLEXIDADE ============ -->
+  <section class="block" id="complexidade">
+    <h2><span class="num">13</span> Complexidade e limites</h2>
+
+    <h3>Custo computacional</h3>
+    <p>
+      A self-attention tem complexidade <strong>O(n² · d)</strong>, onde n é o
+      comprimento da sequência e d a dimensão. Para n=1000, isso é 1 milhão de
+      operações por camada e cabeça — administrável. Para n=100.000 (livro
+      inteiro), isso é 10 bilhões — proibitivo.
+    </p>
+
+    <h3>Memória</h3>
+    <p>
+      A matriz de atenção tem tamanho n × n. Para n=10.000, isso é 100 MB por
+      camada — só para os pesos de atenção, sem contar os outros tensores.
+    </p>
+
+    <h3>Caminho de gradiente</h3>
+    <p>
+      Em troca da complexidade quadrática, o caminho entre qualquer dois tokens
+      é <strong>O(1)</strong>. Em uma RNN, é O(n). Isso é a grande vantagem.
+    </p>
+
+    <h3>Soluções para sequências longas</h3>
+    <ul>
+      <li><strong>Sparse attention</strong> — só atende a um subconjunto (Longformer, BigBird, Reformer).</li>
+      <li><strong>Linear attention</strong> — aproximações lineares (Performer, Linformer).</li>
+      <li><strong>FlashAttention</strong> — implementação eficiente em memória, ainda quadrática mas muito otimizada.</li>
+      <li><strong>State Space Models</strong> — Mamba (2023) trata sequências em O(n) com performance comparável.</li>
+      <li><strong>Sliding window attention</strong> — Mistral, modelos modernos restringem a janela local.</li>
+    </ul>
+  </section>
+
+  <!-- ============ VARIANTES ============ -->
+  <section class="block" id="variantes">
+    <h2><span class="num">14</span> Variantes modernas</h2>
+
+    <h3>Encoder-only</h3>
+    <ul>
+      <li><strong>BERT</strong> (Google, 2018) — Bidirectional Encoder Representations. Pré-treino com masked language modeling.</li>
+      <li><strong>RoBERTa</strong> (Facebook, 2019) — BERT com receita de treino melhorada.</li>
+      <li><strong>DeBERTa</strong> (Microsoft, 2020) — atenção desentrelaçada de conteúdo e posição.</li>
+    </ul>
+
+    <h3>Decoder-only</h3>
+    <ul>
+      <li><strong>GPT-1/2/3/4</strong> (OpenAI) — autoregressivos.</li>
+      <li><strong>LLaMA-1/2/3</strong> (Meta) — opensource.</li>
+      <li><strong>Claude</strong> (Anthropic), <strong>Gemini</strong> (Google), <strong>Mistral</strong>.</li>
+    </ul>
+
+    <h3>Encoder-decoder</h3>
+    <ul>
+      <li><strong>T5</strong> (Google, 2019) — "Text-to-Text Transfer Transformer".</li>
+      <li><strong>BART</strong> (Facebook, 2019) — denoising autoencoder.</li>
+      <li><strong>mBART</strong> — versão multilíngue.</li>
+    </ul>
+
+    <h3>Para imagens e modalidades</h3>
+    <ul>
+      <li><strong>ViT — Vision Transformer</strong> (Google, 2020) — divide imagem em patches 16×16 e trata como tokens.</li>
+      <li><strong>DETR</strong> (Facebook, 2020) — detecção de objetos.</li>
+      <li><strong>CLIP</strong> (OpenAI, 2021) — texto e imagem no mesmo espaço.</li>
+      <li><strong>AlphaFold 2</strong> (DeepMind, 2021) — predição de estrutura de proteínas usando atenção.</li>
+    </ul>
+
+    <h3>Eficiência</h3>
+    <ul>
+      <li><strong>Mixture-of-Experts (MoE)</strong> — só ativa parte dos pesos por token. Mixtral, GPT-4 (rumores).</li>
+      <li><strong>Grouped-Query Attention</strong> — várias queries compartilham as mesmas K/V. LLaMA-2.</li>
+      <li><strong>FlashAttention</strong> — algoritmo eficiente para atenção exata.</li>
+    </ul>
+  </section>
+
+  <!-- ============ IMPL ============ -->
+  <section class="block" id="impl">
+    <h2><span class="num">15</span> Implementações</h2>
+
+    <div class="impl">
+      <div class="iname">Hugging Face Transformers</div>
+      <div class="idesc">A biblioteca padrão de fato. 100.000+ modelos pré-treinados (BERT, GPT, T5, LLaMA, etc.) em poucas linhas.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">PyTorch — <code>nn.Transformer</code></div>
+      <div class="idesc">Implementação nativa do Transformer. Útil para entender, mas Hugging Face é prática para uso.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">Annotated Transformer (Harvard NLP)</div>
+      <div class="idesc">Implementação linha-a-linha do paper original, com comentários extensos. Excelente para aprender.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">minGPT / nanoGPT (Karpathy)</div>
+      <div class="idesc">Implementações minimalistas de GPT em 300-500 linhas. Didáticas.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">x-transformers (lucidrains)</div>
+      <div class="idesc">Biblioteca com dezenas de variantes do Transformer, ideal para pesquisa.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">FlashAttention</div>
+      <div class="idesc">Implementação ultra-eficiente de atenção, ~5× mais rápida que naive PyTorch.</div>
+    </div>
+  </section>
+
+  <!-- ============ ARTIGOS ============ -->
+  <section class="block" id="artigos">
+    <h2><span class="num">16</span> Artigos seminais</h2>
+    <div class="papers">
+      <div class="paper">
+        <span class="pyear">2017</span><span class="ptitle">Attention Is All You Need</span><br>
+        <span class="pauthors">Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan Gomez, Łukasz Kaiser, Illia Polosukhin — NeurIPS</span>
+        <div class="psumm">O paper que mudou tudo. Leitura obrigatória.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2018</span><span class="ptitle">BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding</span><br>
+        <span class="pauthors">Jacob Devlin, Ming-Wei Chang, Kenton Lee, Kristina Toutanova — Google</span>
+        <div class="psumm">Estabeleceu o paradigma de pré-treino + fine-tuning.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2018</span><span class="ptitle">Improving Language Understanding by Generative Pre-Training (GPT-1)</span><br>
+        <span class="pauthors">Radford et al. — OpenAI</span>
+        <div class="psumm">Primeira família GPT. Mostrou poder do pré-treino autoregressivo.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2019</span><span class="ptitle">Language Models are Unsupervised Multitask Learners (GPT-2)</span><br>
+        <span class="pauthors">Radford et al. — OpenAI</span>
+        <div class="psumm">Escala drasticamente o GPT-1.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2019</span><span class="ptitle">Exploring the Limits of Transfer Learning with a Unified Text-to-Text Transformer (T5)</span><br>
+        <span class="pauthors">Raffel et al. — Google</span>
+        <div class="psumm">Encoder-decoder treinado em texto-para-texto unificado.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2020</span><span class="ptitle">An Image is Worth 16×16 Words (ViT)</span><br>
+        <span class="pauthors">Dosovitskiy et al. — Google</span>
+        <div class="psumm">Transformer aplicado a imagens. Marco da visão computacional moderna.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2020</span><span class="ptitle">Language Models are Few-Shot Learners (GPT-3)</span><br>
+        <span class="pauthors">Brown et al. — OpenAI</span>
+        <div class="psumm">175B de parâmetros. Demonstrou few-shot learning em larga escala.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2020</span><span class="ptitle">Linformer / Longformer / Reformer / Performer</span><br>
+        <span class="pauthors">Várias equipes</span>
+        <div class="psumm">Várias atenções aproximadas para sequências longas.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2021</span><span class="ptitle">CLIP — Learning Transferable Visual Models From Natural Language Supervision</span><br>
+        <span class="pauthors">Radford et al. — OpenAI</span>
+        <div class="psumm">Aprende imagens e texto no mesmo espaço.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2021</span><span class="ptitle">AlphaFold 2 — Highly accurate protein structure prediction</span><br>
+        <span class="pauthors">Jumper et al. — DeepMind — Nature</span>
+        <div class="psumm">Transformer especializado para proteínas. Resolveu um dos problemas mais antigos da biologia.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2022</span><span class="ptitle">FlashAttention</span><br>
+        <span class="pauthors">Tri Dao et al. — Stanford</span>
+        <div class="psumm">Implementação ultra-eficiente da atenção.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2023</span><span class="ptitle">LLaMA: Open and Efficient Foundation Language Models</span><br>
+        <span class="pauthors">Touvron et al. — Meta</span>
+        <div class="psumm">Marco do open-source. Aceleração dramática da pesquisa pública.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ APROFUNDAR ============ -->
+  <section class="block" id="aprofundar">
+    <h2><span class="num">17</span> Para se aprofundar</h2>
+
+    <ul>
+      <li><strong>Jay Alammar — "The Illustrated Transformer"</strong>: o post mais famoso da internet sobre Transformers. Leitura obrigatória.</li>
+      <li><strong>Andrej Karpathy — "Let's build GPT from scratch"</strong> (YouTube): 2 horas implementando GPT do zero.</li>
+      <li><strong>Annotated Transformer</strong> (Harvard NLP).</li>
+      <li><strong>Lilian Weng — "The Transformer Family"</strong>: catálogo de variantes.</li>
+      <li><strong>Transformer Circuits</strong> (Anthropic): tentativa de entender o que cada componente faz.</li>
+      <li><strong>3Blue1Brown — Visual Transformer series</strong>: animações lindas.</li>
+    </ul>
+  </section>
+
+  <a href="llm.html" class="deeplink">
+    <span class="arrow">→</span>
+    <span class="dt">Próxima arquitetura</span>
+    <span class="dn">LLMs Modernos — GPT, Claude, Gemini</span>
+  </a>
+
+  <footer>
+    <p>Página detalhada · Transformer · Parte do projeto <a href="index.html">Histórico de Evolução dos Modelos de IA</a></p>
+  </footer>
+</div>
+</body>
+</html>

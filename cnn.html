@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CNN — Redes Convolucionais — Página Detalhada</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <nav class="topnav">
+    <a href="index.html">← Voltar ao índice</a>
+    <span class="crumbs">Arquitetura · 1989 / 1998 / 2012</span>
+  </nav>
+
+  <header class="hero">
+    <div class="eyebrow">A rede que aprendeu a ver · 1989 → 2012 → hoje</div>
+    <h1>CNN — Redes Convolucionais</h1>
+    <p class="lead">
+      Imagine ensinar uma máquina a reconhecer um gato. Em uma MLP, cada pixel
+      seria um neurônio independente — e mover o gato 5 pixels para a direita
+      seria como uma imagem inteiramente nova. As CNNs resolvem esse absurdo
+      copiando uma ideia do córtex visual: <em>operadores locais que deslizam pela
+      imagem inteira procurando padrões</em>.
+    </p>
+  </header>
+
+  <div class="toc">
+    <h4>Sumário</h4>
+    <ol>
+      <li><a href="#contexto">Por que precisávamos de uma nova ideia</a></li>
+      <li><a href="#bio">Inspiração biológica: Hubel e Wiesel</a></li>
+      <li><a href="#convolucao">A operação de convolução</a></li>
+      <li><a href="#filtros">Filtros e mapas de ativação</a></li>
+      <li><a href="#pooling">Pooling: reduzindo dimensão</a></li>
+      <li><a href="#hierarquia">A hierarquia de features</a></li>
+      <li><a href="#arquitetura">Arquitetura típica de uma CNN</a></li>
+      <li><a href="#lenet">LeNet-5: a primeira CNN bem-sucedida</a></li>
+      <li><a href="#alexnet">AlexNet e a revolução ImageNet</a></li>
+      <li><a href="#vggresnet">VGG, GoogLeNet, ResNet</a></li>
+      <li><a href="#modernas">Arquiteturas modernas</a></li>
+      <li><a href="#aplicacoes">Aplicações além da imagem</a></li>
+      <li><a href="#impl">Implementações e frameworks</a></li>
+      <li><a href="#artigos">Artigos seminais</a></li>
+      <li><a href="#aprofundar">Para se aprofundar</a></li>
+    </ol>
+  </div>
+
+  <!-- ============ CONTEXTO ============ -->
+  <section class="block" id="contexto">
+    <h2><span class="num">1</span> Por que precisávamos de uma nova ideia</h2>
+
+    <p>
+      Vamos fazer uma conta. Uma imagem colorida pequena de 224×224 pixels tem
+      <strong>224 × 224 × 3 = 150.528</strong> valores de entrada. Se a primeira
+      camada oculta de uma MLP tiver "apenas" mil neurônios, isso já dá
+      <strong>150 milhões de pesos</strong> — só na primeira camada.
+    </p>
+
+    <p>
+      E pior: a MLP <strong>não tem noção de vizinhança</strong>. Para ela, o pixel
+      (50, 50) não tem nenhuma relação especial com o pixel (51, 50). Cada um é uma
+      feature independente. Se você treinar uma MLP para reconhecer um gato no
+      canto superior esquerdo, ela falha quando o gato aparece no canto inferior
+      direito — precisa aprender tudo de novo.
+    </p>
+
+    <p>
+      Os pesquisadores perceberam que imagens têm <strong>duas propriedades
+      especiais</strong>:
+    </p>
+    <ol>
+      <li><strong>Localidade</strong> — pixels próximos pertencem ao mesmo objeto;
+          pixels distantes raramente importam diretamente.</li>
+      <li><strong>Equivariância de translação</strong> — um gato deslocado ainda é um gato;
+          padrões podem aparecer em qualquer posição.</li>
+    </ol>
+
+    <p>
+      A CNN incorpora essas duas propriedades na própria arquitetura. É um exemplo
+      lindo de <em>indutive bias</em>: você embute o que sabe sobre o problema na
+      estrutura do modelo, e ele aprende muito mais rápido com muito menos dados.
+    </p>
+  </section>
+
+  <!-- ============ BIO ============ -->
+  <section class="block" id="bio">
+    <h2><span class="num">2</span> Inspiração biológica: Hubel e Wiesel</h2>
+
+    <p>
+      Em 1962, os neurofisiologistas <strong>David Hubel</strong> e
+      <strong>Torsten Wiesel</strong> publicaram experimentos com gatos onde
+      registraram a atividade de neurônios individuais no córtex visual primário
+      (V1) enquanto mostravam diferentes estímulos. A descoberta foi revolucionária:
+    </p>
+
+    <ul>
+      <li>Neurônios em V1 respondem a <strong>regiões pequenas</strong> do campo visual (campos receptivos).</li>
+      <li>Cada neurônio é especializado em um <strong>tipo de padrão</strong> — alguns reagem a linhas verticais, outros a horizontais, outros a diagonais em um ângulo específico.</li>
+      <li>O mesmo padrão aparece em várias posições — sugerindo neurônios <strong>especialistas no mesmo padrão</strong> distribuídos pela área visual.</li>
+      <li>Camadas mais profundas do córtex respondem a padrões <strong>cada vez mais complexos</strong>: V1 vê bordas, V2 vê texturas, V4 vê formas, IT vê objetos inteiros.</li>
+    </ul>
+
+    <p>
+      Hubel e Wiesel ganharam o Nobel de Medicina em 1981. E seus achados
+      inspiraram diretamente o <strong>Neocognitron</strong> de Kunihiko Fukushima
+      (1980), que por sua vez inspirou as CNNs de Yann LeCun.
+    </p>
+
+    <div class="analogy">
+      <span class="tag">Analogia · detetives especialistas</span>
+      <p>
+        Imagine uma equipe de detetives que examina uma foto de cena de crime.
+        Um é especialista em digitais. Outro em pegadas. Outro em fios de cabelo.
+        Cada um varre a foto inteira procurando <em>o seu</em> padrão e marca onde
+        achou. Depois, um detetive sênior combina as marcações de todos para
+        montar a história. Essa é exatamente a estrutura de uma CNN: filtros
+        especializados varrendo a imagem, e camadas superiores combinando os
+        resultados.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ CONVOLUÇÃO ============ -->
+  <section class="block" id="convolucao">
+    <h2><span class="num">3</span> A operação de convolução</h2>
+
+    <p>
+      Convolução é a operação central. Em palavras: você tem uma matriz pequena
+      (chamada <strong>kernel</strong> ou <strong>filtro</strong>), e a faz
+      "deslizar" sobre a imagem. Em cada posição, multiplica elemento por elemento
+      e soma. O resultado é um único número — o valor da convolução naquela posição.
+    </p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg">
+        <!-- imagem 5x5 -->
+        <g transform="translate(40,50)">
+          <text x="80" y="-10" text-anchor="middle" class="svg-label">Imagem 5×5</text>
+          <g font-family="JetBrains Mono, monospace" font-size="12">
+            <rect x="0"   y="0"   width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="20" y="25" text-anchor="middle" fill="#e9ecf8">3</text>
+            <rect x="40"  y="0"   width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="60" y="25" text-anchor="middle" fill="#e9ecf8">0</text>
+            <rect x="80"  y="0"   width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="100" y="25" text-anchor="middle" fill="#e9ecf8">1</text>
+            <rect x="120" y="0"   width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="140" y="25" text-anchor="middle" fill="#e9ecf8">2</text>
+            <rect x="160" y="0"   width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="180" y="25" text-anchor="middle" fill="#e9ecf8">7</text>
+
+            <rect x="0"   y="40"  width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="20" y="65" text-anchor="middle" fill="#e9ecf8">1</text>
+            <rect x="40"  y="40"  width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="60" y="65" text-anchor="middle" fill="#e9ecf8">5</text>
+            <rect x="80"  y="40"  width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="100" y="65" text-anchor="middle" fill="#e9ecf8">8</text>
+            <rect x="120" y="40"  width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="140" y="65" text-anchor="middle" fill="#e9ecf8">9</text>
+            <rect x="160" y="40"  width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="180" y="65" text-anchor="middle" fill="#e9ecf8">3</text>
+
+            <rect x="0"   y="80"  width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="20" y="105" text-anchor="middle" fill="#e9ecf8">2</text>
+            <rect x="40"  y="80"  width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="60" y="105" text-anchor="middle" fill="#e9ecf8">7</text>
+            <rect x="80"  y="80"  width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="100" y="105" text-anchor="middle" fill="#e9ecf8">2</text>
+            <rect x="120" y="80"  width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="140" y="105" text-anchor="middle" fill="#e9ecf8">5</text>
+            <rect x="160" y="80"  width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="180" y="105" text-anchor="middle" fill="#e9ecf8">1</text>
+
+            <rect x="0"   y="120" width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="20" y="145" text-anchor="middle" fill="#e9ecf8">4</text>
+            <rect x="40"  y="120" width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="60" y="145" text-anchor="middle" fill="#e9ecf8">1</text>
+            <rect x="80"  y="120" width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="100" y="145" text-anchor="middle" fill="#e9ecf8">6</text>
+            <rect x="120" y="120" width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="140" y="145" text-anchor="middle" fill="#e9ecf8">0</text>
+            <rect x="160" y="120" width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="180" y="145" text-anchor="middle" fill="#e9ecf8">2</text>
+
+            <rect x="0"   y="160" width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="20" y="185" text-anchor="middle" fill="#e9ecf8">9</text>
+            <rect x="40"  y="160" width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="60" y="185" text-anchor="middle" fill="#e9ecf8">3</text>
+            <rect x="80"  y="160" width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="100" y="185" text-anchor="middle" fill="#e9ecf8">4</text>
+            <rect x="120" y="160" width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="140" y="185" text-anchor="middle" fill="#e9ecf8">7</text>
+            <rect x="160" y="160" width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="180" y="185" text-anchor="middle" fill="#e9ecf8">5</text>
+          </g>
+          <!-- highlight kernel position -->
+          <rect x="0" y="0" width="120" height="120" fill="none" stroke="#ffb86b" stroke-width="3"/>
+        </g>
+
+        <!-- kernel 3x3 -->
+        <g transform="translate(310,90)">
+          <text x="60" y="-10" text-anchor="middle" class="svg-label">Kernel 3×3</text>
+          <g font-family="JetBrains Mono, monospace" font-size="12">
+            <rect x="0"  y="0"  width="40" height="40" fill="#b07aff" opacity="0.5" stroke="#b07aff"/><text x="20" y="25" text-anchor="middle" fill="#fff">1</text>
+            <rect x="40" y="0"  width="40" height="40" fill="#b07aff" opacity="0.5" stroke="#b07aff"/><text x="60" y="25" text-anchor="middle" fill="#fff">0</text>
+            <rect x="80" y="0"  width="40" height="40" fill="#b07aff" opacity="0.5" stroke="#b07aff"/><text x="100" y="25" text-anchor="middle" fill="#fff">−1</text>
+            <rect x="0"  y="40" width="40" height="40" fill="#b07aff" opacity="0.5" stroke="#b07aff"/><text x="20" y="65" text-anchor="middle" fill="#fff">2</text>
+            <rect x="40" y="40" width="40" height="40" fill="#b07aff" opacity="0.5" stroke="#b07aff"/><text x="60" y="65" text-anchor="middle" fill="#fff">0</text>
+            <rect x="80" y="40" width="40" height="40" fill="#b07aff" opacity="0.5" stroke="#b07aff"/><text x="100" y="65" text-anchor="middle" fill="#fff">−2</text>
+            <rect x="0"  y="80" width="40" height="40" fill="#b07aff" opacity="0.5" stroke="#b07aff"/><text x="20" y="105" text-anchor="middle" fill="#fff">1</text>
+            <rect x="40" y="80" width="40" height="40" fill="#b07aff" opacity="0.5" stroke="#b07aff"/><text x="60" y="105" text-anchor="middle" fill="#fff">0</text>
+            <rect x="80" y="80" width="40" height="40" fill="#b07aff" opacity="0.5" stroke="#b07aff"/><text x="100" y="105" text-anchor="middle" fill="#fff">−1</text>
+          </g>
+          <text x="60" y="150" text-anchor="middle" class="svg-label">(Sobel-X: detecta bordas verticais)</text>
+        </g>
+
+        <!-- arrow -->
+        <text x="445" y="170" class="svg-text">→</text>
+
+        <!-- output -->
+        <g transform="translate(490,90)">
+          <text x="60" y="-10" text-anchor="middle" class="svg-label">Saída 3×3</text>
+          <g font-family="JetBrains Mono, monospace" font-size="11">
+            <rect x="0"  y="0"  width="40" height="40" fill="#4fd1c5" opacity="0.3"/><text x="20" y="25" text-anchor="middle" fill="#fff">3×1+0+1×−1+1×2+...</text>
+            <rect x="40" y="0"  width="40" height="40" fill="#4fd1c5" opacity="0.5"/><text x="60" y="25" text-anchor="middle" fill="#fff">−5</text>
+            <rect x="80" y="0"  width="40" height="40" fill="#4fd1c5" opacity="0.7"/><text x="100" y="25" text-anchor="middle" fill="#fff">−7</text>
+            <rect x="0"  y="40" width="40" height="40" fill="#4fd1c5" opacity="0.5"/><text x="20" y="65" text-anchor="middle" fill="#fff">3</text>
+            <rect x="40" y="40" width="40" height="40" fill="#4fd1c5" opacity="0.6"/><text x="60" y="65" text-anchor="middle" fill="#fff">−2</text>
+            <rect x="80" y="40" width="40" height="40" fill="#4fd1c5" opacity="0.8"/><text x="100" y="65" text-anchor="middle" fill="#fff">9</text>
+            <rect x="0"  y="80" width="40" height="40" fill="#4fd1c5" opacity="0.4"/><text x="20" y="105" text-anchor="middle" fill="#fff">−1</text>
+            <rect x="40" y="80" width="40" height="40" fill="#4fd1c5" opacity="0.6"/><text x="60" y="105" text-anchor="middle" fill="#fff">−4</text>
+            <rect x="80" y="80" width="40" height="40" fill="#4fd1c5" opacity="0.7"/><text x="100" y="105" text-anchor="middle" fill="#fff">3</text>
+          </g>
+        </g>
+
+        <text x="380" y="320" text-anchor="middle" class="svg-label">Cada saída = soma das multiplicações elemento a elemento (correlação cruzada).</text>
+      </svg>
+      <div class="caption">Operação de convolução: o kernel desliza pela imagem, e cada posição produz um valor na saída.</div>
+    </div>
+
+    <h3>Em fórmula</h3>
+    <div class="formula">
+      <div class="fname">Convolução 2D</div>
+      Y[i, j] = Σₐ Σᵦ K[a, b] · X[i+a, j+b]
+    </div>
+
+    <h3>Stride e padding</h3>
+    <ul>
+      <li><strong>Stride</strong> — de quantos pixels o filtro pula a cada passo. Stride=1: passa por todos. Stride=2: reduz o tamanho pela metade.</li>
+      <li><strong>Padding</strong> — adiciona zeros nas bordas da imagem para preservar o tamanho de saída. "Same padding" = saída tem mesmo tamanho da entrada.</li>
+    </ul>
+  </section>
+
+  <!-- ============ FILTROS ============ -->
+  <section class="block" id="filtros">
+    <h2><span class="num">4</span> Filtros e mapas de ativação</h2>
+
+    <p>
+      Numa CNN, os valores do filtro <strong>não são fixos</strong> — são aprendidos
+      durante o treino. Cada filtro acaba especializado em detectar um padrão
+      específico. Os primeiros filtros tendem a aprender:
+    </p>
+
+    <ul>
+      <li>Bordas em diferentes ângulos</li>
+      <li>Variações de cor / brilho</li>
+      <li>Texturas simples (ondulações, gradientes)</li>
+    </ul>
+
+    <p>
+      Uma camada convolucional típica tem <strong>vários filtros em paralelo</strong>
+      (32, 64, 128, 256, ...). Cada filtro gera um <em>mapa de ativações</em>
+      separado. Empilhando esses mapas, formamos um "volume" — a entrada da próxima
+      camada convolucional.
+    </p>
+
+    <h3>O efeito do peso compartilhado</h3>
+    <p>
+      A propriedade mais elegante: <strong>o mesmo filtro é aplicado em toda a
+      imagem</strong>. Isso significa:
+    </p>
+    <ul>
+      <li><strong>Muito menos parâmetros</strong> — um filtro 3×3 tem 9 pesos. Mesmo aplicado em uma imagem 224×224, ainda são só 9 pesos.</li>
+      <li><strong>Equivariância de translação</strong> — se o padrão aparecer em qualquer posição, o filtro o detecta.</li>
+      <li><strong>Generalização</strong> — o que a rede aprende em uma posição, vale para todas.</li>
+    </ul>
+
+    <div class="analogy">
+      <span class="tag">Analogia · carimbo na página</span>
+      <p>
+        Pense num carimbo de "URGENTE" usado para marcar documentos. Você usa o
+        <em>mesmo</em> carimbo em toda a página — não precisa ter um carimbo
+        diferente para cada posição. Um filtro convolucional é esse carimbo: um
+        padrão único aplicado em todas as posições. A rede aprende muitos carimbos
+        diferentes (um para bordas, um para cantos, um para olhos, etc.).
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ POOLING ============ -->
+  <section class="block" id="pooling">
+    <h2><span class="num">5</span> Pooling: reduzindo dimensão</h2>
+
+    <p>
+      Após a convolução, geralmente vem uma operação de <strong>pooling</strong>.
+      A mais comum é o <em>max pooling 2×2</em>: divide o mapa em janelinhas 2×2
+      e fica com o maior valor de cada. Resultado: o mapa fica com metade do
+      tamanho em cada dimensão.
+    </p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg">
+        <text x="120" y="20" text-anchor="middle" fill="#7aa2ff" font-weight="700">Entrada 4×4</text>
+        <g font-family="JetBrains Mono, monospace" font-size="12">
+          <rect x="40"  y="40" width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="60" y="65" text-anchor="middle" fill="#e9ecf8">1</text>
+          <rect x="80"  y="40" width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="100" y="65" text-anchor="middle" fill="#e9ecf8">3</text>
+          <rect x="120" y="40" width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="140" y="65" text-anchor="middle" fill="#e9ecf8">2</text>
+          <rect x="160" y="40" width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="180" y="65" text-anchor="middle" fill="#e9ecf8">4</text>
+          <rect x="40"  y="80" width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="60" y="105" text-anchor="middle" fill="#e9ecf8">5</text>
+          <rect x="80"  y="80" width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="100" y="105" text-anchor="middle" fill="#e9ecf8">6</text>
+          <rect x="120" y="80" width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="140" y="105" text-anchor="middle" fill="#e9ecf8">7</text>
+          <rect x="160" y="80" width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="180" y="105" text-anchor="middle" fill="#e9ecf8">8</text>
+          <rect x="40"  y="120" width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="60" y="145" text-anchor="middle" fill="#e9ecf8">9</text>
+          <rect x="80"  y="120" width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="100" y="145" text-anchor="middle" fill="#e9ecf8">2</text>
+          <rect x="120" y="120" width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="140" y="145" text-anchor="middle" fill="#e9ecf8">1</text>
+          <rect x="160" y="120" width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="180" y="145" text-anchor="middle" fill="#e9ecf8">3</text>
+          <rect x="40"  y="160" width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="60" y="185" text-anchor="middle" fill="#e9ecf8">4</text>
+          <rect x="80"  y="160" width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="100" y="185" text-anchor="middle" fill="#e9ecf8">5</text>
+          <rect x="120" y="160" width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="140" y="185" text-anchor="middle" fill="#e9ecf8">6</text>
+          <rect x="160" y="160" width="40" height="40" fill="#1f2952" stroke="#7aa2ff"/><text x="180" y="185" text-anchor="middle" fill="#e9ecf8">2</text>
+        </g>
+        <!-- highlights -->
+        <rect x="40"  y="40"  width="80" height="80" fill="none" stroke="#ffb86b" stroke-width="2"/>
+        <rect x="120" y="40"  width="80" height="80" fill="none" stroke="#ffb86b" stroke-width="2"/>
+        <rect x="40"  y="120" width="80" height="80" fill="none" stroke="#ffb86b" stroke-width="2"/>
+        <rect x="120" y="120" width="80" height="80" fill="none" stroke="#ffb86b" stroke-width="2"/>
+
+        <text x="240" y="115" class="svg-text">→</text>
+
+        <text x="380" y="20" text-anchor="middle" fill="#4fd1c5" font-weight="700">Max-pool 2×2</text>
+        <g font-family="JetBrains Mono, monospace" font-size="14">
+          <rect x="300" y="40"  width="80" height="80" fill="#4fd1c5" opacity="0.4"/><text x="340" y="85" text-anchor="middle" fill="#fff" font-weight="700">6</text>
+          <rect x="380" y="40"  width="80" height="80" fill="#4fd1c5" opacity="0.5"/><text x="420" y="85" text-anchor="middle" fill="#fff" font-weight="700">8</text>
+          <rect x="300" y="120" width="80" height="80" fill="#4fd1c5" opacity="0.6"/><text x="340" y="165" text-anchor="middle" fill="#fff" font-weight="700">9</text>
+          <rect x="380" y="120" width="80" height="80" fill="#4fd1c5" opacity="0.7"/><text x="420" y="165" text-anchor="middle" fill="#fff" font-weight="700">6</text>
+        </g>
+      </svg>
+      <div class="caption">Max pooling 2×2 com stride 2: divide em janelas 2×2 e fica com o maior valor. Mapa fica 4× menor.</div>
+    </div>
+
+    <h3>Por que pooling funciona</h3>
+    <ul>
+      <li><strong>Reduz computação</strong> — menos pixels, menos operações.</li>
+      <li><strong>Invariância a pequenas translações</strong> — se o pixel mais ativado se moveu 1 posição dentro da janela, o máximo continua o mesmo.</li>
+      <li><strong>Expande o campo receptivo</strong> — após pooling, cada neurônio "vê" uma região maior da imagem original.</li>
+    </ul>
+
+    <div class="callout">
+      <span class="tag">Tendência moderna</span>
+      <p>
+        Algumas arquiteturas modernas (como ResNet) substituem o pooling por
+        <strong>convoluções com stride 2</strong> — mantém o efeito de reduzir
+        dimensão sem perder informação por máximo. Outras (ViT, MLP-Mixer) não
+        usam pooling de jeito nenhum.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ HIERARQUIA ============ -->
+  <section class="block" id="hierarquia">
+    <h2><span class="num">6</span> A hierarquia de features</h2>
+
+    <p>
+      O que torna as CNNs verdadeiramente poderosas não é uma camada convolucional
+      sozinha — é <strong>empilhar várias delas</strong>. A cada camada, a rede
+      aprende padrões cada vez mais complexos.
+    </p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg">
+        <!-- pirâmide invertida -->
+        <g transform="translate(40,30)">
+          <text x="60" y="-5" text-anchor="middle" fill="#7aa2ff" font-weight="700">Camada 1</text>
+          <rect x="0" y="0" width="120" height="60" rx="8" fill="#1f2952" stroke="#7aa2ff" stroke-width="2"/>
+          <text x="60" y="30" text-anchor="middle" class="svg-text">bordas</text>
+          <text x="60" y="48" text-anchor="middle" class="svg-text">cores</text>
+        </g>
+        <text x="180" y="65" class="svg-text">→</text>
+        <g transform="translate(210,30)">
+          <text x="60" y="-5" text-anchor="middle" fill="#b07aff" font-weight="700">Camada 2</text>
+          <rect x="0" y="0" width="120" height="60" rx="8" fill="#1f2952" stroke="#b07aff" stroke-width="2"/>
+          <text x="60" y="30" text-anchor="middle" class="svg-text">cantos</text>
+          <text x="60" y="48" text-anchor="middle" class="svg-text">curvas</text>
+        </g>
+        <text x="350" y="65" class="svg-text">→</text>
+        <g transform="translate(380,30)">
+          <text x="60" y="-5" text-anchor="middle" fill="#ffb86b" font-weight="700">Camada 3</text>
+          <rect x="0" y="0" width="120" height="60" rx="8" fill="#1f2952" stroke="#ffb86b" stroke-width="2"/>
+          <text x="60" y="30" text-anchor="middle" class="svg-text">olhos, narizes</text>
+          <text x="60" y="48" text-anchor="middle" class="svg-text">rodas, janelas</text>
+        </g>
+        <text x="520" y="65" class="svg-text">→</text>
+        <g transform="translate(550,30)">
+          <text x="60" y="-5" text-anchor="middle" fill="#4fd1c5" font-weight="700">Camada 4+</text>
+          <rect x="0" y="0" width="120" height="60" rx="8" fill="#1f2952" stroke="#4fd1c5" stroke-width="2"/>
+          <text x="60" y="30" text-anchor="middle" class="svg-text">faces, carros</text>
+          <text x="60" y="48" text-anchor="middle" class="svg-text">objetos</text>
+        </g>
+
+        <text x="350" y="160" text-anchor="middle" fill="#e9ecf8" font-weight="700">A profundidade transforma pixels em conceitos.</text>
+        <text x="350" y="190" text-anchor="middle" class="svg-label">Os primeiros artigos sobre interpretabilidade (Zeiler &amp; Fergus, 2014;</text>
+        <text x="350" y="210" text-anchor="middle" class="svg-label">Olah et al. em Distill, 2017) visualizaram exatamente esses padrões.</text>
+      </svg>
+      <div class="caption">A profundidade de uma CNN constrói uma hierarquia: pixels → bordas → partes → objetos.</div>
+    </div>
+
+    <div class="analogy">
+      <span class="tag">Analogia · construindo um Lego</span>
+      <p>
+        Imagine montar um castelo de Lego. Camada 1 são as peças individuais.
+        Camada 2 são pequenos agrupamentos (uma parede, um arco). Camada 3 são
+        partes maiores (uma torre, uma porta). Camada 4 é o castelo todo.
+        Você não consegue ir direto das peças ao castelo — passa por níveis
+        intermediários. CNNs aprendem essa hierarquia automaticamente.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ ARQUITETURA ============ -->
+  <section class="block" id="arquitetura">
+    <h2><span class="num">7</span> Arquitetura típica de uma CNN</h2>
+
+    <p>
+      Uma CNN clássica para classificação tem três blocos:
+    </p>
+    <ol>
+      <li><strong>Stem</strong> — convoluções e poolings iniciais que extraem features.</li>
+      <li><strong>Body</strong> — vários blocos convolucionais empilhados.</li>
+      <li><strong>Head</strong> — camadas densas finais para a classificação.</li>
+    </ol>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg">
+        <!-- entrada -->
+        <rect x="20" y="60" width="80" height="80" rx="6" fill="#1f2952" stroke="#7aa2ff" stroke-width="2"/>
+        <text x="60" y="105" text-anchor="middle" class="svg-text">imagem</text>
+        <text x="60" y="160" text-anchor="middle" class="svg-label">224×224×3</text>
+
+        <!-- conv -->
+        <rect x="130" y="50" width="100" height="100" rx="6" fill="#b07aff" opacity="0.4"/>
+        <text x="180" y="100" text-anchor="middle" fill="#fff" font-size="13">Conv+ReLU</text>
+        <text x="180" y="170" text-anchor="middle" class="svg-label">112×112×64</text>
+
+        <!-- pool -->
+        <rect x="250" y="60" width="80" height="80" rx="6" fill="#4fd1c5" opacity="0.4"/>
+        <text x="290" y="105" text-anchor="middle" fill="#fff" font-size="13">Pool</text>
+        <text x="290" y="160" text-anchor="middle" class="svg-label">56×56×64</text>
+
+        <!-- conv -->
+        <rect x="350" y="50" width="100" height="100" rx="6" fill="#b07aff" opacity="0.6"/>
+        <text x="400" y="100" text-anchor="middle" fill="#fff" font-size="13">Conv+ReLU</text>
+        <text x="400" y="170" text-anchor="middle" class="svg-label">28×28×128</text>
+
+        <!-- conv -->
+        <rect x="470" y="50" width="100" height="100" rx="6" fill="#b07aff" opacity="0.8"/>
+        <text x="520" y="100" text-anchor="middle" fill="#fff" font-size="13">Conv+ReLU</text>
+        <text x="520" y="170" text-anchor="middle" class="svg-label">7×7×512</text>
+
+        <!-- flatten -->
+        <rect x="590" y="60" width="60" height="80" rx="6" fill="#ffb86b" opacity="0.6"/>
+        <text x="620" y="105" text-anchor="middle" fill="#fff" font-size="12">Flatten</text>
+
+        <!-- dense -->
+        <rect x="670" y="60" width="70" height="80" rx="6" fill="#ff7a90" opacity="0.7"/>
+        <text x="705" y="100" text-anchor="middle" fill="#fff" font-size="12">Dense</text>
+        <text x="705" y="115" text-anchor="middle" fill="#fff" font-size="12">+ softmax</text>
+        <text x="705" y="170" text-anchor="middle" class="svg-label">1000 classes</text>
+      </svg>
+      <div class="caption">Pipeline típico: a imagem vai diminuindo espacialmente e ganhando "profundidade" (mais canais).</div>
+    </div>
+
+    <h3>Receita prática</h3>
+    <ol>
+      <li>Comece com conv + ReLU + (eventual pool).</li>
+      <li>Vá aumentando o número de canais (16 → 32 → 64 → 128 → 256 → 512) conforme reduz espacialmente.</li>
+      <li>Termine com uma ou duas camadas densas e softmax.</li>
+      <li>Use dropout (10-50%) antes das camadas densas para regularizar.</li>
+      <li>Adicione batch normalization após cada convolução para acelerar o treino.</li>
+    </ol>
+  </section>
+
+  <!-- ============ LENET ============ -->
+  <section class="block" id="lenet">
+    <h2><span class="num">8</span> LeNet-5: a primeira CNN bem-sucedida</h2>
+
+    <p>
+      Em 1998, <strong>Yann LeCun</strong> (então no Bell Labs) publicou um artigo
+      onde aplicou uma CNN ao problema de reconhecer dígitos escritos à mão. A
+      arquitetura, chamada <strong>LeNet-5</strong>, tinha:
+    </p>
+
+    <ul>
+      <li>Entrada: imagem 32×32 em preto e branco</li>
+      <li>2 camadas convolucionais (6 e 16 filtros)</li>
+      <li>2 camadas de pooling</li>
+      <li>3 camadas densas (120, 84, 10)</li>
+    </ul>
+
+    <p>
+      A LeNet-5 atingiu erro de 0,95% no MNIST e foi <strong>colocada em produção</strong>
+      em sistemas bancários americanos para ler cheques. Estima-se que processou
+      <em>bilhões</em> de cheques nos anos 90 — uma das primeiras aplicações comerciais
+      de uma rede neural profunda.
+    </p>
+
+    <div class="callout">
+      <span class="tag">Detalhe histórico</span>
+      <p>
+        Apesar do sucesso da LeNet, redes neurais permaneceram à margem do
+        mainstream nos anos 2000. SVMs e métodos baseados em features manuais
+        (SIFT, HOG) dominaram. Faltavam GPUs poderosas, datasets grandes e
+        técnicas de regularização modernas. Tudo isso mudaria em 2012.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ ALEXNET ============ -->
+  <section class="block" id="alexnet">
+    <h2><span class="num">9</span> AlexNet e a revolução ImageNet</h2>
+
+    <p>
+      O <strong>ImageNet Large Scale Visual Recognition Challenge (ILSVRC)</strong>
+      era a competição anual mais importante de visão computacional. Em 2010 e
+      2011, os melhores sistemas (baseados em SIFT + SVM) tinham erro top-5 de
+      cerca de 28%.
+    </p>
+
+    <p>
+      Em 2012, três pesquisadores da Universidade de Toronto submeteram uma rede
+      neural profunda: <strong>AlexNet</strong>. Os autores foram
+      <strong>Alex Krizhevsky</strong> (que deu nome), <strong>Ilya Sutskever</strong>
+      e <strong>Geoffrey Hinton</strong>. O resultado:
+    </p>
+
+    <table class="compare">
+      <thead><tr><th>Posição</th><th>Equipe</th><th>Erro top-5</th></tr></thead>
+      <tbody>
+        <tr><td>1°</td><td>SuperVision (AlexNet)</td><td>15,3%</td></tr>
+        <tr><td>2°</td><td>ISI (Tokyo)</td><td>26,2%</td></tr>
+        <tr><td>3°</td><td>Oxford</td><td>26,9%</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      Quase <strong>11 pontos percentuais</strong> à frente do segundo colocado —
+      uma margem inédita. O paper que descreveu o sistema virou um dos mais citados
+      da história da ciência da computação.
+    </p>
+
+    <h3>O que fez AlexNet funcionar</h3>
+    <ul>
+      <li><strong>GPUs</strong> — treinaram em duas GTX 580 por 5-6 dias. Sem GPUs, levaria meses.</li>
+      <li><strong>ReLU</strong> — primeira CNN a usar ReLU em larga escala. Acelerou o treino em 6×.</li>
+      <li><strong>Dropout</strong> — regularização nova que evitou overfitting.</li>
+      <li><strong>Data augmentation</strong> — flip horizontal, crops aleatórios, jitter de cor.</li>
+      <li><strong>Tamanho</strong> — 60 milhões de parâmetros, 8 camadas. Para a época, era enorme.</li>
+    </ul>
+
+    <p>
+      AlexNet é considerado o marco zero do deep learning moderno. A partir dali, a
+      pesquisa em IA explodiu, fundos vieram de novo, e o céu virou o limite.
+    </p>
+  </section>
+
+  <!-- ============ VGGRESNET ============ -->
+  <section class="block" id="vggresnet">
+    <h2><span class="num">10</span> VGG, GoogLeNet, ResNet</h2>
+
+    <h3>VGG (Oxford, 2014)</h3>
+    <p>
+      Karen Simonyan e Andrew Zisserman simplificaram drasticamente: <em>somente
+      convoluções 3×3 e max-pooling 2×2, empilhadas até 19 camadas</em>. Mostrou
+      que profundidade importa. VGG-16 ainda é usado como backbone em muitos
+      modelos modernos por ser elegante e bem-compreendido.
+    </p>
+
+    <h3>GoogLeNet / Inception (Google, 2014)</h3>
+    <p>
+      Christian Szegedy e equipe introduziram o <strong>módulo Inception</strong>:
+      convoluções 1×1, 3×3, 5×5 e pooling em paralelo, com resultados concatenados.
+      A ideia: deixar a rede decidir qual escala usar em cada camada. Reduziu drasticamente
+      o número de parâmetros (5 M vs. 60 M da AlexNet) com performance similar.
+    </p>
+
+    <h3>ResNet (Microsoft, 2015)</h3>
+    <p>
+      Em 2015, <strong>Kaiming He</strong> e equipe da Microsoft Research treinaram
+      a primeira rede com <strong>152 camadas</strong>. Como? Adicionando
+      <strong>conexões residuais (skip connections)</strong> que permitem ao
+      gradiente fluir diretamente entre camadas distantes.
+    </p>
+
+    <div class="formula">
+      <div class="fname">Bloco residual</div>
+      saída = F(entrada) + entrada
+    </div>
+
+    <p>
+      Em vez de aprender uma transformação F(x), a rede aprende uma "correção"
+      F(x) = saída − entrada. É mais fácil aprender pequenas correções do que
+      transformações completas, especialmente em redes muito profundas.
+    </p>
+
+    <div class="analogy">
+      <span class="tag">Analogia · escada com elevador</span>
+      <p>
+        Imagine um prédio de 152 andares. Subir de escada (passar por todas as
+        camadas) seria exaustivo. ResNet adiciona um elevador (skip connection)
+        em cada andar: você pode usar a escada para ajustes finos ou o elevador
+        para ir direto. Os gradientes fluem pelo elevador, evitando o
+        "vanishing".
+      </p>
+    </div>
+
+    <p>
+      ResNet venceu o ImageNet 2015 com erro top-5 de 3,57% — <em>superando humanos</em>
+      (estimados em 5%). Conexões residuais viraram ingrediente padrão em quase
+      todas as arquiteturas modernas, inclusive Transformers.
+    </p>
+  </section>
+
+  <!-- ============ MODERNAS ============ -->
+  <section class="block" id="modernas">
+    <h2><span class="num">11</span> Arquiteturas modernas</h2>
+
+    <ul>
+      <li><strong>DenseNet (2017)</strong> — cada camada recebe entrada de todas as anteriores. Reutilização máxima de features.</li>
+      <li><strong>MobileNet (2017)</strong> — convoluções "depthwise separable" para rodar em celulares.</li>
+      <li><strong>EfficientNet (2019)</strong> — busca arquitetural sistemática que equilibra profundidade, largura e resolução.</li>
+      <li><strong>ConvNeXt (2022)</strong> — modernização das CNNs com técnicas dos Transformers, mostrando que CNNs ainda podem competir.</li>
+    </ul>
+
+    <h3>CNNs vs. Vision Transformers</h3>
+    <p>
+      Em 2020, o paper <strong>"An Image is Worth 16×16 Words"</strong> mostrou
+      que Transformers (originalmente para texto) podem superar CNNs em
+      classificação de imagens — desde que treinados em datasets massivos.
+      O confronto entre arquiteturas continua. Hoje, CNNs dominam em cenários
+      com dados limitados; ViTs dominam em escala massiva.
+    </p>
+  </section>
+
+  <!-- ============ APLICAÇÕES ============ -->
+  <section class="block" id="aplicacoes">
+    <h2><span class="num">12</span> Aplicações além da imagem</h2>
+
+    <p>
+      A operação de convolução não está restrita a imagens 2D. Existem variações:
+    </p>
+    <ul>
+      <li><strong>Conv1D</strong> — para sinais 1D: áudio, séries temporais, ECG.</li>
+      <li><strong>Conv2D</strong> — imagens.</li>
+      <li><strong>Conv3D</strong> — vídeos (tempo + espaço) e ressonâncias médicas.</li>
+      <li><strong>Graph Convolutions (GCN)</strong> — convolução em grafos para redes sociais, moléculas, mapas.</li>
+    </ul>
+
+    <h3>Tarefas dominadas por CNNs</h3>
+    <ul>
+      <li><strong>Classificação</strong> de imagens (qual classe?)</li>
+      <li><strong>Detecção de objetos</strong> (onde e o quê?) — YOLO, Faster R-CNN, RetinaNet.</li>
+      <li><strong>Segmentação semântica</strong> (qual classe em cada pixel?) — U-Net, DeepLab.</li>
+      <li><strong>Reconhecimento facial</strong> — FaceNet, ArcFace.</li>
+      <li><strong>Diagnóstico médico</strong> — radiologia, dermatologia, oftalmologia.</li>
+      <li><strong>Carros autônomos</strong> — visão para Tesla, Waymo, etc.</li>
+      <li><strong>Estilo de transferência</strong> — Neural Style Transfer (Gatys, 2015).</li>
+      <li><strong>Geração</strong> — backbone de muitas GANs e modelos de difusão.</li>
+    </ul>
+  </section>
+
+  <!-- ============ IMPL ============ -->
+  <section class="block" id="impl">
+    <h2><span class="num">13</span> Implementações e frameworks</h2>
+
+    <div class="impl">
+      <div class="iname">PyTorch — <code>torch.nn.Conv2d</code></div>
+      <div class="idesc">API simples: <code>Conv2d(in_ch, out_ch, kernel_size, stride, padding)</code>. <code>torchvision</code> fornece dezenas de modelos pré-treinados.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">TensorFlow / Keras — <code>tf.keras.layers.Conv2D</code></div>
+      <div class="idesc">Modelo de alto nível com <code>Sequential</code> e <code>Model</code>. Modelos pré-treinados em <code>tf.keras.applications</code>.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">timm (PyTorch Image Models)</div>
+      <div class="idesc">Repositório com 700+ modelos de visão pré-treinados, mantido por Ross Wightman. Padrão de fato em pesquisa.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">Detectron2 (Facebook)</div>
+      <div class="idesc">Framework para detecção e segmentação. Implementa Faster R-CNN, Mask R-CNN, RetinaNet, etc.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">Ultralytics YOLO</div>
+      <div class="idesc">Família YOLO para detecção em tempo real. Modelos compactos prontos para edge computing.</div>
+    </div>
+  </section>
+
+  <!-- ============ ARTIGOS ============ -->
+  <section class="block" id="artigos">
+    <h2><span class="num">14</span> Artigos seminais</h2>
+    <div class="papers">
+      <div class="paper">
+        <span class="pyear">1980</span><span class="ptitle">Neocognitron: A Self-organizing Neural Network Model for a Mechanism of Pattern Recognition Unaffected by Shift in Position</span><br>
+        <span class="pauthors">Kunihiko Fukushima — Biological Cybernetics</span>
+        <div class="psumm">Precursor direto das CNNs. Inspirado nos achados de Hubel e Wiesel sobre o córtex visual.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">1989</span><span class="ptitle">Backpropagation Applied to Handwritten Zip Code Recognition</span><br>
+        <span class="pauthors">Yann LeCun et al. — Neural Computation</span>
+        <div class="psumm">Primeira aplicação prática de CNN treinada com backprop. Reconhecimento de CEPs nos correios americanos.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">1998</span><span class="ptitle">Gradient-Based Learning Applied to Document Recognition (LeNet-5)</span><br>
+        <span class="pauthors">Yann LeCun, Léon Bottou, Yoshua Bengio, Patrick Haffner — Proceedings of the IEEE</span>
+        <div class="psumm">A LeNet-5 e sua aplicação ao reconhecimento de cheques bancários.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2012</span><span class="ptitle">ImageNet Classification with Deep Convolutional Neural Networks (AlexNet)</span><br>
+        <span class="pauthors">Alex Krizhevsky, Ilya Sutskever, Geoffrey Hinton — NeurIPS</span>
+        <div class="psumm">O paper que iniciou a era do deep learning moderno.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2014</span><span class="ptitle">Very Deep Convolutional Networks for Large-Scale Image Recognition (VGG)</span><br>
+        <span class="pauthors">Karen Simonyan, Andrew Zisserman — ICLR</span>
+        <div class="psumm">Mostra que profundidade pura, com conv 3×3 simples, leva a grandes ganhos.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2014</span><span class="ptitle">Going Deeper with Convolutions (GoogLeNet / Inception)</span><br>
+        <span class="pauthors">Christian Szegedy et al. — CVPR</span>
+        <div class="psumm">Módulo Inception, eficiência computacional, profundidade extrema.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2014</span><span class="ptitle">Visualizing and Understanding Convolutional Networks</span><br>
+        <span class="pauthors">Matthew Zeiler, Rob Fergus — ECCV</span>
+        <div class="psumm">Técnicas de visualização que revelaram a hierarquia de features.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2015</span><span class="ptitle">Deep Residual Learning for Image Recognition (ResNet)</span><br>
+        <span class="pauthors">Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun — CVPR</span>
+        <div class="psumm">Conexões residuais que viabilizaram redes de 152+ camadas.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2015</span><span class="ptitle">U-Net: Convolutional Networks for Biomedical Image Segmentation</span><br>
+        <span class="pauthors">Olaf Ronneberger, Philipp Fischer, Thomas Brox — MICCAI</span>
+        <div class="psumm">Arquitetura U-shape para segmentação. Base de muitos modelos médicos e de difusão.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2017</span><span class="ptitle">Densely Connected Convolutional Networks (DenseNet)</span><br>
+        <span class="pauthors">Gao Huang, Zhuang Liu, Laurens van der Maaten, Kilian Weinberger — CVPR</span>
+        <div class="psumm">Cada camada conectada a todas as anteriores.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2017</span><span class="ptitle">MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications</span><br>
+        <span class="pauthors">Howard et al. — Google</span>
+        <div class="psumm">Convoluções depthwise separable para celulares.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2019</span><span class="ptitle">EfficientNet: Rethinking Model Scaling for Convolutional Neural Networks</span><br>
+        <span class="pauthors">Mingxing Tan, Quoc Le — ICML</span>
+        <div class="psumm">Escalonamento composto: aumentar profundidade, largura e resolução de forma equilibrada.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2022</span><span class="ptitle">A ConvNet for the 2020s (ConvNeXt)</span><br>
+        <span class="pauthors">Zhuang Liu et al. — CVPR</span>
+        <div class="psumm">CNNs modernizadas com técnicas dos Transformers, competindo de igual para igual com ViTs.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ APROFUNDAR ============ -->
+  <section class="block" id="aprofundar">
+    <h2><span class="num">15</span> Para se aprofundar</h2>
+
+    <h3>Cursos</h3>
+    <ul>
+      <li><strong>Stanford CS231n — Convolutional Neural Networks for Visual Recognition</strong> (Andrej Karpathy, Fei-Fei Li): o curso de referência.</li>
+      <li><strong>fast.ai — Practical Deep Learning</strong>: foco em fazer funcionar.</li>
+      <li><strong>Deep Learning Specialization</strong> (Coursera, Andrew Ng), curso 4: CNNs.</li>
+    </ul>
+
+    <h3>Visualizações</h3>
+    <ul>
+      <li><strong>Distill.pub</strong> — artigos visuais sobre features, atenção, otimização.</li>
+      <li><strong>CNN Explainer</strong> — poloclub.github.io/cnn-explainer/</li>
+    </ul>
+
+    <h3>Próximos passos</h3>
+    <p>
+      CNNs resolveram a parte espacial. Para a parte temporal, vieram as
+      <a href="rnn.html">RNNs</a> e suas filhas, as <a href="lstm.html">LSTMs</a>.
+      Mais tarde, os <a href="transformer.html">Transformers</a> ofereceriam uma
+      alternativa unificada para ambos.
+    </p>
+  </section>
+
+  <a href="rnn.html" class="deeplink">
+    <span class="arrow">→</span>
+    <span class="dt">Próxima arquitetura</span>
+    <span class="dn">RNN — Redes Recorrentes</span>
+  </a>
+
+  <footer>
+    <p>Página detalhada · CNN — Redes Convolucionais · Parte do projeto <a href="index.html">Histórico de Evolução dos Modelos de IA</a></p>
+  </footer>
+</div>
+</body>
+</html>

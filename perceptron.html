@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perceptron — Página Detalhada</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <nav class="topnav">
+    <a href="index.html">← Voltar ao índice</a>
+    <span class="crumbs">Arquitetura · 1943–1958</span>
+  </nav>
+
+  <header class="hero">
+    <div class="eyebrow">A semente de toda IA · 1943–1958</div>
+    <h1>Perceptron</h1>
+    <p class="lead">
+      O ancestral comum de todas as redes neurais modernas. Antes de existir
+      <em>deep learning</em>, <em>GPT</em> ou <em>Transformer</em>, existia um
+      único neurônio artificial somando entradas e disparando se elas passassem
+      de um limiar. Esta página explora essa ideia simples — e por que ela
+      mudou a história da computação.
+    </p>
+  </header>
+
+  <div class="toc">
+    <h4>Sumário</h4>
+    <ol>
+      <li><a href="#historia">A história: de McCulloch ao Mark I</a></li>
+      <li><a href="#inspiracao">A inspiração biológica</a></li>
+      <li><a href="#anatomia">Anatomia do Perceptron</a></li>
+      <li><a href="#funcionamento">Como ele realmente funciona</a></li>
+      <li><a href="#aprendizado">O algoritmo de aprendizado</a></li>
+      <li><a href="#geometria">A intuição geométrica</a></li>
+      <li><a href="#exemplo">Um exemplo passo a passo</a></li>
+      <li><a href="#xor">O problema do XOR (o inverno da IA)</a></li>
+      <li><a href="#variantes">Variantes e extensões</a></li>
+      <li><a href="#aplicacoes">Aplicações práticas hoje</a></li>
+      <li><a href="#impl">Implementações famosas</a></li>
+      <li><a href="#artigos">Artigos seminais</a></li>
+      <li><a href="#aprofundar">Para se aprofundar</a></li>
+    </ol>
+  </div>
+
+  <!-- ============ HISTÓRIA ============ -->
+  <section class="block" id="historia">
+    <h2><span class="num">1</span> A história: de McCulloch ao Mark I</h2>
+
+    <h3>1943 — O neurônio matemático de McCulloch e Pitts</h3>
+    <p>
+      Em plena Segunda Guerra Mundial, o neurofisiologista <strong>Warren McCulloch</strong>
+      e o jovem matemático <strong>Walter Pitts</strong> publicaram um artigo intitulado
+      <em>"A Logical Calculus of the Ideas Immanent in Nervous Activity"</em>. A tese era
+      ousada: <strong>cérebros são máquinas lógicas</strong>. Eles propuseram que um
+      neurônio biológico poderia ser modelado por uma função binária — ele dispara (1)
+      ou não dispara (0), conforme suas entradas e um limiar.
+    </p>
+    <p>
+      Esse foi o primeiro modelo computacional inspirado em neurônios. Era estático
+      (sem aprendizado), mas plantou a semente da ideia: <em>se conseguirmos descrever um
+      neurônio em matemática, podemos construí-lo em circuitos</em>.
+    </p>
+
+    <h3>1949 — A regra de Hebb</h3>
+    <p>
+      Pouco depois, o psicólogo canadense <strong>Donald Hebb</strong> propôs uma regra
+      que ficaria famosa: <em>"Cells that fire together, wire together"</em> (neurônios
+      que disparam juntos, se conectam mais). Era uma teoria sobre <strong>como o
+      cérebro aprende</strong>. McCulloch-Pitts modelavam o "ser"; Hebb explicava o
+      "tornar-se". Combinados, esses dois trabalhos abriram o caminho para o Perceptron.
+    </p>
+
+    <h3>1958 — Frank Rosenblatt apresenta o Perceptron</h3>
+    <p>
+      No laboratório aeronáutico de Cornell, <strong>Frank Rosenblatt</strong>, um
+      psicólogo treinado em estatística, construiu o <strong>Mark I Perceptron</strong>:
+      uma máquina física do tamanho de um armário, com motores, potenciômetros e
+      400 fotocélulas. Ela aprendia a distinguir cartões com triângulos de cartões
+      com quadrados — <em>sozinha</em>, ajustando os pesos por feedback.
+    </p>
+    <p>
+      O <strong>New York Times</strong> noticiou em manchete: <em>"New Navy Device
+      Learns by Doing"</em>, prevendo que em breve teríamos máquinas capazes de
+      andar, falar, ver e se reproduzir. O hype era enorme — e prematuro.
+    </p>
+
+    <div class="callout">
+      <span class="tag">Curiosidade</span>
+      <p>
+        O Mark I tinha 512 unidades associativas conectadas a 400 fotorreceptores
+        através de fios soldados <strong>aleatoriamente</strong> à mão. A "memória"
+        eram potenciômetros girados por motores. Hoje, qualquer celular treina
+        milhões de perceptrons em milissegundos.
+      </p>
+    </div>
+
+    <h3>1969 — O golpe de Minsky e Papert</h3>
+    <p>
+      Onze anos depois, <strong>Marvin Minsky</strong> (MIT) e <strong>Seymour
+      Papert</strong> publicaram o livro <em>Perceptrons</em>. Eles provaram
+      matematicamente que um perceptron simples <strong>não consegue aprender
+      funções não-linearmente separáveis</strong> — incluindo o famoso XOR (ou
+      exclusivo). O efeito foi devastador: financiamento minguou, pesquisadores
+      migraram para outras áreas, e começou o que ficou conhecido como o
+      <em>"primeiro inverno da IA"</em>, que duraria quase duas décadas.
+    </p>
+    <p>
+      Ironicamente, Minsky e Papert <em>não</em> demonstraram que <em>múltiplas
+      camadas</em> de perceptrons teriam a mesma limitação — pelo contrário,
+      reconheceram que poderiam superá-la. Mas faltava um algoritmo eficiente
+      para treiná-las. Esse algoritmo (o backpropagation) só seria amplamente
+      adotado em 1986.
+    </p>
+  </section>
+
+  <!-- ============ INSPIRAÇÃO ============ -->
+  <section class="block" id="inspiracao">
+    <h2><span class="num">2</span> A inspiração biológica</h2>
+
+    <p>
+      Um neurônio no cérebro humano funciona assim, de forma simplificada:
+    </p>
+    <ol>
+      <li>Recebe sinais elétricos por seus <strong>dendritos</strong> (entradas).</li>
+      <li>Esses sinais são integrados no <strong>corpo celular</strong> (soma).</li>
+      <li>Se a integração ultrapassa um limiar, o neurônio <strong>dispara</strong>
+          um pulso elétrico pelo <strong>axônio</strong> (saída).</li>
+      <li>Esse pulso vai por <strong>sinapses</strong> a outros neurônios — cada
+          sinapse pode ser mais ou menos forte (peso).</li>
+    </ol>
+
+    <div class="diagram">
+      <svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg">
+        <!-- Neurônio biológico -->
+        <text x="180" y="20" text-anchor="middle" fill="#7aa2ff" font-weight="700">Neurônio biológico</text>
+        <!-- corpo -->
+        <circle cx="200" cy="140" r="50" fill="#1f2952" stroke="#7aa2ff" stroke-width="2"/>
+        <text x="200" y="145" text-anchor="middle" class="svg-text">soma</text>
+        <!-- dendritos -->
+        <path d="M150 140 C 100 130, 60 100, 30 90"  stroke="#4fd1c5" stroke-width="2" fill="none"/>
+        <path d="M150 145 C 100 150, 60 140, 30 140" stroke="#4fd1c5" stroke-width="2" fill="none"/>
+        <path d="M150 155 C 100 170, 60 190, 30 195" stroke="#4fd1c5" stroke-width="2" fill="none"/>
+        <text x="20" y="80" class="svg-label">dendritos</text>
+        <!-- axônio -->
+        <line x1="250" y1="140" x2="370" y2="140" stroke="#b07aff" stroke-width="3"/>
+        <text x="310" y="130" text-anchor="middle" class="svg-label">axônio</text>
+        <!-- sinapse -->
+        <circle cx="380" cy="140" r="8" fill="#ffb86b"/>
+        <text x="380" y="170" text-anchor="middle" class="svg-label">sinapse</text>
+
+        <!-- Perceptron equivalente -->
+        <text x="560" y="20" text-anchor="middle" fill="#b07aff" font-weight="700">Perceptron</text>
+        <circle cx="450" cy="100" r="14" fill="#1f2952" stroke="#7aa2ff" stroke-width="2"/>
+        <text x="450" y="105" text-anchor="middle" class="svg-text">x₁</text>
+        <circle cx="450" cy="140" r="14" fill="#1f2952" stroke="#7aa2ff" stroke-width="2"/>
+        <text x="450" y="145" text-anchor="middle" class="svg-text">x₂</text>
+        <circle cx="450" cy="180" r="14" fill="#1f2952" stroke="#7aa2ff" stroke-width="2"/>
+        <text x="450" y="185" text-anchor="middle" class="svg-text">x₃</text>
+        <circle cx="580" cy="140" r="34" fill="#b07aff" opacity="0.85"/>
+        <text x="580" y="146" text-anchor="middle" fill="#fff" font-weight="700" font-size="18">Σ</text>
+        <line x1="464" y1="100" x2="546" y2="140" stroke="#7aa2ff"/>
+        <line x1="464" y1="140" x2="546" y2="140" stroke="#7aa2ff"/>
+        <line x1="464" y1="180" x2="546" y2="140" stroke="#7aa2ff"/>
+        <text x="500" y="95" class="svg-label">w₁</text>
+        <text x="510" y="135" class="svg-label">w₂</text>
+        <text x="500" y="180" class="svg-label">w₃</text>
+        <line x1="614" y1="140" x2="680" y2="140" stroke="#4fd1c5" stroke-width="2"/>
+        <text x="680" y="135" text-anchor="end" class="svg-text">y</text>
+
+        <!-- correspondências -->
+        <text x="100" y="245" class="svg-label">dendritos ↔ entradas (xᵢ)</text>
+        <text x="300" y="245" class="svg-label">sinapses ↔ pesos (wᵢ)</text>
+        <text x="500" y="245" class="svg-label">soma + disparo ↔ ativação</text>
+      </svg>
+      <div class="caption">Cada componente do neurônio biológico tem um análogo direto no perceptron.</div>
+    </div>
+
+    <div class="callout">
+      <span class="tag">Aviso importante</span>
+      <p>
+        Apesar da analogia biológica, redes neurais artificiais são apenas
+        <strong>vagamente inspiradas</strong> em neurônios reais. Um neurônio
+        biológico é muito mais complexo: tem dinâmica temporal, neurotransmissores
+        químicos, plasticidade dependente de tempo de disparo, e por aí vai.
+        O perceptron é uma <em>caricatura matemática</em> útil, não uma simulação fiel.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ ANATOMIA ============ -->
+  <section class="block" id="anatomia">
+    <h2><span class="num">3</span> Anatomia do Perceptron</h2>
+
+    <p>O perceptron tem cinco componentes essenciais:</p>
+
+    <div class="cards">
+      <div class="card"><div class="ck">Entradas</div><div class="cv">x₁, x₂, ..., xₙ — números reais que descrevem o exemplo</div></div>
+      <div class="card"><div class="ck">Pesos</div><div class="cv">w₁, w₂, ..., wₙ — quanto cada entrada importa</div></div>
+      <div class="card"><div class="ck">Bias</div><div class="cv">b — desloca o limiar de decisão</div></div>
+      <div class="card"><div class="ck">Soma ponderada</div><div class="cv">z = Σ wᵢxᵢ + b</div></div>
+      <div class="card"><div class="ck">Ativação</div><div class="cv">y = step(z) — degrau (1 se z≥0, senão 0)</div></div>
+    </div>
+
+    <div class="diagram">
+      <svg viewBox="0 0 720 360" xmlns="http://www.w3.org/2000/svg">
+        <!-- entradas -->
+        <g>
+          <circle cx="80" cy="60" r="22" fill="#1f2952" stroke="#7aa2ff" stroke-width="2"/>
+          <text x="80" y="65" text-anchor="middle" class="svg-text">x₁</text>
+          <circle cx="80" cy="130" r="22" fill="#1f2952" stroke="#7aa2ff" stroke-width="2"/>
+          <text x="80" y="135" text-anchor="middle" class="svg-text">x₂</text>
+          <circle cx="80" cy="200" r="22" fill="#1f2952" stroke="#7aa2ff" stroke-width="2"/>
+          <text x="80" y="205" text-anchor="middle" class="svg-text">x₃</text>
+          <circle cx="80" cy="270" r="22" fill="#1f2952" stroke="#ffb86b" stroke-width="2"/>
+          <text x="80" y="275" text-anchor="middle" class="svg-text">1</text>
+          <text x="80" y="305" text-anchor="middle" class="svg-label">bias</text>
+        </g>
+        <!-- pesos como rótulos das arestas -->
+        <line x1="102" y1="60"  x2="320" y2="170" stroke="#7aa2ff" stroke-width="1.5"/>
+        <text x="180" y="100" fill="#b07aff" font-weight="700">w₁</text>
+        <line x1="102" y1="130" x2="320" y2="175" stroke="#7aa2ff" stroke-width="1.5"/>
+        <text x="190" y="145" fill="#b07aff" font-weight="700">w₂</text>
+        <line x1="102" y1="200" x2="320" y2="185" stroke="#7aa2ff" stroke-width="1.5"/>
+        <text x="200" y="210" fill="#b07aff" font-weight="700">w₃</text>
+        <line x1="102" y1="270" x2="320" y2="195" stroke="#ffb86b" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <text x="200" y="265" fill="#ffb86b" font-weight="700">b</text>
+        <!-- soma -->
+        <circle cx="370" cy="180" r="42" fill="#b07aff" opacity="0.85"/>
+        <text x="370" y="175" text-anchor="middle" fill="#fff" font-size="22" font-weight="700">Σ</text>
+        <text x="370" y="195" text-anchor="middle" fill="#fff" font-size="11">soma</text>
+        <text x="370" y="245" text-anchor="middle" class="svg-label">z = Σwᵢxᵢ + b</text>
+        <!-- ativação -->
+        <rect x="450" y="155" width="120" height="50" rx="8" fill="#1f2952" stroke="#4fd1c5" stroke-width="2"/>
+        <text x="510" y="180" text-anchor="middle" class="svg-text">step(z)</text>
+        <text x="510" y="225" text-anchor="middle" class="svg-label">ativação</text>
+        <line x1="412" y1="180" x2="450" y2="180" stroke="#4fd1c5" stroke-width="2"/>
+        <!-- saída -->
+        <circle cx="640" cy="180" r="26" fill="#4fd1c5" opacity="0.9"/>
+        <text x="640" y="186" text-anchor="middle" fill="#0b1020" font-weight="700" font-size="16">y</text>
+        <line x1="570" y1="180" x2="614" y2="180" stroke="#4fd1c5" stroke-width="2"/>
+        <text x="640" y="225" text-anchor="middle" class="svg-label">saída ∈ {0,1}</text>
+
+        <!-- mini gráfico step -->
+        <g transform="translate(440,260)">
+          <text x="70" y="-5" text-anchor="middle" class="svg-label">função degrau</text>
+          <line x1="0"  y1="50" x2="140" y2="50" stroke="#8089ad"/>
+          <line x1="70" y1="0"  x2="70"  y2="80" stroke="#8089ad"/>
+          <line x1="0"  y1="50" x2="70"  y2="50" stroke="#4fd1c5" stroke-width="2.5"/>
+          <line x1="70" y1="10" x2="140" y2="10" stroke="#4fd1c5" stroke-width="2.5"/>
+          <line x1="70" y1="50" x2="70"  y2="10" stroke="#4fd1c5" stroke-width="1" stroke-dasharray="3 2"/>
+          <text x="125" y="20" class="svg-label">1</text>
+          <text x="10"  y="65" class="svg-label">0</text>
+          <text x="70"  y="90" text-anchor="middle" class="svg-label">z</text>
+        </g>
+      </svg>
+      <div class="caption">Diagrama completo: 3 entradas + bias, pesos, soma ponderada, ativação degrau e saída binária.</div>
+    </div>
+
+    <h3>O papel do bias</h3>
+    <p>
+      O <strong>bias</strong> (b) é talvez o componente menos intuitivo. Ele é uma
+      entrada constante igual a 1, com seu próprio peso. Sua função é simples mas
+      essencial: <em>permitir que a fronteira de decisão não passe pela origem</em>.
+      Sem bias, todo perceptron seria forçado a dizer "0" quando todas as entradas
+      são 0 — uma restrição arbitrária e prejudicial.
+    </p>
+
+    <div class="analogy">
+      <span class="tag">Analogia · bias</span>
+      <p>
+        Pense num <strong>termômetro de febre</strong>: o limiar (37,5°C) não é a
+        origem da escala, é um valor deslocado. O bias é esse deslocamento — ele
+        diz "a partir de quanto eu considero febre".
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ FUNCIONAMENTO ============ -->
+  <section class="block" id="funcionamento">
+    <h2><span class="num">4</span> Como ele realmente funciona</h2>
+
+    <div class="formula">
+      <div class="fname">Equação completa do perceptron</div>
+      z = w₁·x₁ + w₂·x₂ + ... + wₙ·xₙ + b<br>
+      y = step(z) = { 1, se z ≥ 0 ; 0, se z &lt; 0 }
+    </div>
+
+    <p>
+      Em notação vetorial (mais elegante):
+    </p>
+    <div class="formula">
+      z = <strong>w</strong> · <strong>x</strong> + b<br>
+      y = step(z)
+    </div>
+
+    <p>
+      Onde <strong>w</strong> e <strong>x</strong> são vetores e o "·" é o produto
+      interno (produto escalar). Essa é uma das fórmulas mais importantes de todas
+      as redes neurais — você verá variações dela em CNNs, RNNs e Transformers.
+    </p>
+
+    <h3>Quatro analogias para fixar a ideia</h3>
+
+    <div class="analogy">
+      <span class="tag">Analogia 1 · porteiro de balada</span>
+      <p>
+        O porteiro avalia cada pessoa por critérios (idade, vestimenta, atitude).
+        Cada critério tem um <em>peso</em> (algumas baladas dão peso enorme à
+        vestimenta; outras, à idade). Ele soma mentalmente, e se a pontuação
+        passar do limiar, libera a entrada. Se você lhe disser "errou" depois,
+        ele ajusta seus pesos para a próxima vez.
+      </p>
+    </div>
+
+    <div class="analogy">
+      <span class="tag">Analogia 2 · receita de bolo com nota</span>
+      <p>
+        Imagine que você dá uma nota a um bolo somando: <em>doçura × 0,3 + textura
+        × 0,5 + aroma × 0,2</em>. Se a nota ≥ 7, "passa"; senão, "reprovado". Os
+        números 0,3 / 0,5 / 0,2 são os pesos. A "soma vs. limiar" é exatamente o
+        que o perceptron faz.
+      </p>
+    </div>
+
+    <div class="analogy">
+      <span class="tag">Analogia 3 · juiz com balança</span>
+      <p>
+        Pense num juiz pesando provas. Cada evidência (testemunho, DNA, álibi)
+        vai em um prato com um peso diferente. Se o lado "culpado" pesa mais,
+        condena; senão, absolve. O perceptron é um juiz binário com balança
+        ajustável.
+      </p>
+    </div>
+
+    <div class="analogy">
+      <span class="tag">Analogia 4 · alarme inteligente</span>
+      <p>
+        Um alarme residencial soma sensores: sensor de porta (peso 5), sensor de
+        movimento (peso 2), sensor de janela (peso 4), e dispara se a soma ≥ 6.
+        Configurar os pesos é decidir o quanto cada sensor "vale".
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ APRENDIZADO ============ -->
+  <section class="block" id="aprendizado">
+    <h2><span class="num">5</span> O algoritmo de aprendizado</h2>
+
+    <p>
+      O grande feito de Rosenblatt não foi a estrutura — foi o <strong>algoritmo
+      de aprendizado</strong>. Ele provou matematicamente que, se os dados são
+      linearmente separáveis, sua regra de atualização <em>converge</em> em um
+      número finito de passos.
+    </p>
+
+    <h3>A regra de atualização</h3>
+    <div class="formula">
+      <div class="fname">Regra do Perceptron</div>
+      Para cada exemplo (x, y_real):<br>
+      &nbsp;&nbsp;y_prev = step(w · x + b)<br>
+      &nbsp;&nbsp;erro   = y_real − y_prev<br>
+      &nbsp;&nbsp;w ← w + η · erro · x<br>
+      &nbsp;&nbsp;b ← b + η · erro<br>
+      <span style="color:var(--muted)">η (eta) = taxa de aprendizado, geralmente entre 0,01 e 1</span>
+    </div>
+
+    <h3>Lendo a regra em português</h3>
+    <ul>
+      <li>Se <strong>acertou</strong> (erro = 0), não muda nada.</li>
+      <li>Se previu 0 mas era 1 (erro = +1), <strong>aumenta</strong> os pesos das entradas ativas.</li>
+      <li>Se previu 1 mas era 0 (erro = −1), <strong>diminui</strong> os pesos das entradas ativas.</li>
+    </ul>
+
+    <div class="analogy">
+      <span class="tag">Analogia · o porteiro aprendendo</span>
+      <p>
+        Toda vez que o porteiro deixa entrar alguém que <em>não devia</em>
+        (festa atrapalha), ele anota: "da próxima vez que vir esses sinais, vou
+        ser mais rigoroso". Toda vez que <em>barra alguém que devia entrar</em>
+        (cliente VIP), ele anota: "preciso ser menos rigoroso com esses sinais".
+        Os "ajustes mentais" são exatamente a regra do perceptron.
+      </p>
+    </div>
+
+    <h3>Teorema da convergência</h3>
+    <p>
+      Rosenblatt e Novikoff provaram (em 1962, formalmente) que se os dados são
+      linearmente separáveis com uma margem γ > 0 e os vetores de entrada têm
+      norma ≤ R, então o perceptron converge em no máximo <strong>(R/γ)²</strong>
+      atualizações. Não importa a inicialização. É um resultado lindo — e raro
+      em aprendizado de máquina, onde garantias de convergência são poucas.
+    </p>
+
+    <div class="tip">
+      <span class="tag">Por que importa hoje</span>
+      <p>
+        A regra do perceptron é o ancestral direto do <strong>Stochastic Gradient
+        Descent (SGD)</strong>, que treina praticamente todas as redes neurais
+        modernas. A ideia central é a mesma: olhe um exemplo, compute o erro,
+        ajuste os pesos na direção que reduz o erro. Tudo o que veio depois foi
+        refinamento: melhores funções de ativação, melhores funções de perda,
+        melhores estratégias de atualização (Adam, RMSProp).
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ GEOMETRIA ============ -->
+  <section class="block" id="geometria">
+    <h2><span class="num">6</span> A intuição geométrica</h2>
+
+    <p>
+      Aqui está uma das visões mais belas do perceptron: ele é simplesmente uma
+      <strong>linha (ou hiperplano)</strong> que separa o espaço em duas regiões.
+      Em 2D, é uma reta. Em 3D, um plano. Em n-D, um hiperplano.
+    </p>
+
+    <p>
+      A equação <strong>w · x + b = 0</strong> define essa fronteira. Tudo de um
+      lado da reta vira "1"; tudo do outro vira "0". O vetor <strong>w</strong> é
+      perpendicular à reta e aponta na direção do "1".
+    </p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 720 360" xmlns="http://www.w3.org/2000/svg">
+        <!-- eixos -->
+        <line x1="60"  y1="320" x2="660" y2="320" stroke="#8089ad" stroke-width="1.5"/>
+        <line x1="360" y1="40"  x2="360" y2="340" stroke="#8089ad" stroke-width="1.5"/>
+        <text x="660" y="335" class="svg-label">x₁</text>
+        <text x="370" y="40"  class="svg-label">x₂</text>
+
+        <!-- reta de decisão -->
+        <line x1="80" y1="280" x2="640" y2="80" stroke="#ffb86b" stroke-width="3"/>
+        <text x="450" y="120" fill="#ffb86b" font-weight="700">w·x + b = 0</text>
+
+        <!-- vetor w -->
+        <line x1="360" y1="200" x2="430" y2="120" stroke="#b07aff" stroke-width="2.5" marker-end="url(#arrW)"/>
+        <text x="445" y="115" fill="#b07aff" font-weight="700">w</text>
+        <defs>
+          <marker id="arrW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#b07aff"/></marker>
+        </defs>
+
+        <!-- pontos classe 1 -->
+        <circle cx="500" cy="200" r="8" fill="#4fd1c5"/>
+        <circle cx="550" cy="170" r="8" fill="#4fd1c5"/>
+        <circle cx="520" cy="240" r="8" fill="#4fd1c5"/>
+        <circle cx="580" cy="220" r="8" fill="#4fd1c5"/>
+        <circle cx="450" cy="270" r="8" fill="#4fd1c5"/>
+        <text x="580" y="280" fill="#4fd1c5" font-weight="700">classe 1</text>
+
+        <!-- pontos classe 0 -->
+        <circle cx="180" cy="180" r="8" fill="#ff7a90"/>
+        <circle cx="220" cy="220" r="8" fill="#ff7a90"/>
+        <circle cx="150" cy="240" r="8" fill="#ff7a90"/>
+        <circle cx="250" cy="160" r="8" fill="#ff7a90"/>
+        <circle cx="300" cy="220" r="8" fill="#ff7a90"/>
+        <text x="150" y="280" fill="#ff7a90" font-weight="700">classe 0</text>
+
+        <!-- legenda direções -->
+        <text x="600" y="160" fill="#b07aff" class="svg-label">→ lado "1"</text>
+        <text x="100" y="160" fill="#ff7a90" class="svg-label">lado "0" ←</text>
+      </svg>
+      <div class="caption">O perceptron desenha uma reta no espaço de entradas. O vetor de pesos w é perpendicular à reta.</div>
+    </div>
+
+    <h3>O que "linearmente separável" significa</h3>
+    <p>
+      Um problema é linearmente separável se você consegue desenhar uma única
+      reta (em 2D), plano (em 3D) ou hiperplano (em n-D) que separa perfeitamente
+      as duas classes. Exemplos:
+    </p>
+    <ul>
+      <li><strong>AND</strong>: (0,0)→0, (0,1)→0, (1,0)→0, (1,1)→1 — separável (uma reta com (1,1) de um lado).</li>
+      <li><strong>OR</strong>: (0,0)→0, (0,1)→1, (1,0)→1, (1,1)→1 — separável.</li>
+      <li><strong>XOR</strong>: (0,0)→0, (0,1)→1, (1,0)→1, (1,1)→0 — <em>NÃO</em> é separável por uma única reta!</li>
+    </ul>
+  </section>
+
+  <!-- ============ EXEMPLO ============ -->
+  <section class="block" id="exemplo">
+    <h2><span class="num">7</span> Um exemplo passo a passo: aprendendo o AND</h2>
+
+    <p>
+      Vamos treinar um perceptron para aprender a função lógica AND. Dados:
+    </p>
+
+    <table class="compare">
+      <thead>
+        <tr><th>x₁</th><th>x₂</th><th>y (AND)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>0</td><td>0</td><td>0</td></tr>
+        <tr><td>0</td><td>1</td><td>0</td></tr>
+        <tr><td>1</td><td>0</td><td>0</td></tr>
+        <tr><td>1</td><td>1</td><td>1</td></tr>
+      </tbody>
+    </table>
+
+    <p><strong>Inicialização:</strong> w₁ = 0, w₂ = 0, b = 0, η = 1.</p>
+
+    <h4>Iteração 1 — exemplo (1, 1) com y = 1</h4>
+    <ul>
+      <li>z = 0·1 + 0·1 + 0 = 0 → y_prev = step(0) = 1 (porque z ≥ 0)</li>
+      <li>erro = 1 − 1 = 0 → não muda nada</li>
+    </ul>
+
+    <h4>Iteração 2 — exemplo (0, 0) com y = 0</h4>
+    <ul>
+      <li>z = 0·0 + 0·0 + 0 = 0 → y_prev = 1 (errado!)</li>
+      <li>erro = 0 − 1 = −1</li>
+      <li>w₁ ← 0 + 1·(−1)·0 = 0; w₂ ← 0; b ← 0 + 1·(−1) = −1</li>
+    </ul>
+
+    <h4>Iteração 3 — exemplo (1, 1) com y = 1</h4>
+    <ul>
+      <li>z = 0·1 + 0·1 + (−1) = −1 → y_prev = 0 (errado!)</li>
+      <li>erro = 1 − 0 = 1</li>
+      <li>w₁ ← 0 + 1·1·1 = 1; w₂ ← 0 + 1·1·1 = 1; b ← −1 + 1 = 0</li>
+    </ul>
+
+    <h4>Iteração 4 — exemplo (0, 1) com y = 0</h4>
+    <ul>
+      <li>z = 1·0 + 1·1 + 0 = 1 → y_prev = 1 (errado!)</li>
+      <li>erro = −1; w₁ ← 1; w₂ ← 1 − 1 = 0; b ← −1</li>
+    </ul>
+
+    <p>
+      ...e assim por diante. Após algumas dezenas de iterações, o perceptron
+      converge para algo como <strong>w₁ = 1, w₂ = 1, b = −2</strong>, que
+      classifica corretamente:
+    </p>
+    <ul>
+      <li>(0,0) → 1·0 + 1·0 − 2 = −2 → 0 ✓</li>
+      <li>(0,1) → 1·0 + 1·1 − 2 = −1 → 0 ✓</li>
+      <li>(1,0) → 1·1 + 1·0 − 2 = −1 → 0 ✓</li>
+      <li>(1,1) → 1·1 + 1·1 − 2 =  0 → 1 ✓</li>
+    </ul>
+
+    <h3>Em Python (NumPy)</h3>
+<pre class="code"><span class="kw">import</span> numpy <span class="kw">as</span> np
+
+<span class="kw">def</span> <span class="fn">step</span>(z):
+    <span class="kw">return</span> 1 <span class="kw">if</span> z &gt;= 0 <span class="kw">else</span> 0
+
+X = np.array([[0,0],[0,1],[1,0],[1,1]])
+y = np.array([0, 0, 0, 1])                 <span class="com"># AND</span>
+
+w = np.zeros(2); b = 0.0; eta = 1.0
+
+<span class="kw">for</span> epoch <span class="kw">in</span> range(20):
+    <span class="kw">for</span> xi, yi <span class="kw">in</span> zip(X, y):
+        z = np.dot(w, xi) + b
+        y_pred = step(z)
+        err = yi - y_pred
+        w += eta * err * xi
+        b += eta * err
+
+<span class="fn">print</span>(w, b)   <span class="com"># algo como [1. 1.] -2.0</span>
+</pre>
+  </section>
+
+  <!-- ============ XOR ============ -->
+  <section class="block" id="xor">
+    <h2><span class="num">8</span> O problema do XOR — e o inverno da IA</h2>
+
+    <p>
+      A função XOR (ou exclusivo) é simples: retorna 1 quando exatamente uma das
+      entradas é 1.
+    </p>
+
+    <table class="compare">
+      <thead>
+        <tr><th>x₁</th><th>x₂</th><th>y (XOR)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>0</td><td>0</td><td>0</td></tr>
+        <tr><td>0</td><td>1</td><td>1</td></tr>
+        <tr><td>1</td><td>0</td><td>1</td></tr>
+        <tr><td>1</td><td>1</td><td>0</td></tr>
+      </tbody>
+    </table>
+
+    <div class="diagram">
+      <svg viewBox="0 0 500 320" xmlns="http://www.w3.org/2000/svg">
+        <!-- eixos -->
+        <line x1="60" y1="280" x2="440" y2="280" stroke="#8089ad" stroke-width="1.5"/>
+        <line x1="100" y1="40" x2="100" y2="300" stroke="#8089ad" stroke-width="1.5"/>
+        <text x="445" y="295" class="svg-label">x₁</text>
+        <text x="110" y="40" class="svg-label">x₂</text>
+
+        <!-- 4 pontos do XOR -->
+        <circle cx="100" cy="280" r="12" fill="#ff7a90"/>  <!-- (0,0) → 0 -->
+        <text x="80" y="305" class="svg-label">(0,0)</text>
+        <circle cx="400" cy="280" r="12" fill="#4fd1c5"/>  <!-- (1,0) → 1 -->
+        <text x="385" y="305" class="svg-label">(1,0)</text>
+        <circle cx="100" cy="80"  r="12" fill="#4fd1c5"/>  <!-- (0,1) → 1 -->
+        <text x="40"  y="85" class="svg-label">(0,1)</text>
+        <circle cx="400" cy="80"  r="12" fill="#ff7a90"/>  <!-- (1,1) → 0 -->
+        <text x="420" y="85" class="svg-label">(1,1)</text>
+
+        <!-- Tentativas de reta -->
+        <line x1="60" y1="180" x2="440" y2="180" stroke="#b07aff" stroke-width="2" stroke-dasharray="6 4"/>
+        <line x1="250" y1="40" x2="250" y2="300" stroke="#b07aff" stroke-width="2" stroke-dasharray="6 4"/>
+        <line x1="60" y1="40"  x2="440" y2="320" stroke="#b07aff" stroke-width="2" stroke-dasharray="6 4"/>
+        <text x="450" y="180" fill="#b07aff" class="svg-label">×</text>
+        <text x="250" y="35"  fill="#b07aff" class="svg-label">×</text>
+        <text x="450" y="320" fill="#b07aff" class="svg-label">×</text>
+
+        <text x="260" y="160" text-anchor="middle" fill="#ff7a90" font-weight="700">Nenhuma reta separa as classes!</text>
+      </svg>
+      <div class="caption">No XOR, os pontos da classe 1 e os da classe 0 estão em diagonais opostas. Impossível separar com uma única reta.</div>
+    </div>
+
+    <h3>Por que isso paralisou o campo</h3>
+    <p>
+      O XOR é a função lógica mais elementar depois de AND/OR/NOT. Se um perceptron
+      não consegue aprender XOR, ele não pode formar circuitos lógicos completos.
+      O livro <em>Perceptrons</em> (Minsky &amp; Papert, 1969) demonstrou isso com
+      tanto rigor matemático que muitos pesquisadores ficaram convencidos de que
+      redes neurais eram um beco sem saída.
+    </p>
+    <p>
+      A solução já existia em teoria: <strong>empilhar várias camadas</strong> (uma
+      MLP). Uma MLP com apenas uma camada oculta resolve o XOR facilmente. Mas
+      <em>como treinar os pesos das camadas ocultas?</em> A resposta —
+      <strong>backpropagation</strong> — só seria popularizada em 1986 por
+      Rumelhart, Hinton e Williams.
+    </p>
+  </section>
+
+  <!-- ============ VARIANTES ============ -->
+  <section class="block" id="variantes">
+    <h2><span class="num">9</span> Variantes e extensões</h2>
+
+    <h3>Perceptron com margem (Margin Perceptron)</h3>
+    <p>
+      Variante que exige não apenas classificar correto, mas com uma margem mínima.
+      Mais robusto a ruído. Precursor do <strong>SVM</strong> (Support Vector Machine).
+    </p>
+
+    <h3>Voted Perceptron</h3>
+    <p>
+      Mantém uma lista de todos os pesos visitados durante o treino, e na inferência
+      faz votação. Reduz overfitting. Proposto por Freund e Schapire (1999).
+    </p>
+
+    <h3>Averaged Perceptron</h3>
+    <p>
+      Calcula a média de todos os pesos ao longo do treino. Mais barato que o voted
+      e quase tão bom. Muito usado em PLN clássico (POS tagging, parsing).
+    </p>
+
+    <h3>Multi-classe (one-vs-rest e one-vs-one)</h3>
+    <p>
+      O perceptron original é binário, mas com a estratégia <em>one-vs-rest</em>
+      pode-se treinar K perceptrons para K classes (cada um discrimina "minha classe
+      vs. todo o resto"). Na inferência, escolhe-se o de maior score.
+    </p>
+
+    <h3>Adaline (Widrow-Hoff, 1960)</h3>
+    <p>
+      ADAptive LInear NEuron. Idêntico ao perceptron em arquitetura, mas treina
+      minimizando o erro <em>antes</em> da ativação (regressão linear com sinais
+      ±1). Foi o primeiro neurônio com ativação contínua e gradiente — precursor
+      direto da regressão logística.
+    </p>
+
+    <h3>Regressão logística</h3>
+    <p>
+      Substitua a função degrau por uma <strong>sigmoid</strong> e treine
+      minimizando log-loss. Pronto: você tem regressão logística, que ainda hoje
+      é a baseline mais usada em classificação binária.
+    </p>
+  </section>
+
+  <!-- ============ APLICAÇÕES ============ -->
+  <section class="block" id="aplicacoes">
+    <h2><span class="num">10</span> Aplicações práticas hoje</h2>
+
+    <p>
+      O perceptron, em sua forma pura, raramente é usado em produção. Mas suas
+      variantes diretas (regressão logística, SVM linear, averaged perceptron)
+      ainda dominam tarefas onde:
+    </p>
+    <ul>
+      <li><strong>O sinal é forte e linear</strong> — predição de cliques, detecção
+          de spam por palavras-chave, classificação de sentimento simples.</li>
+      <li><strong>É necessário velocidade extrema</strong> — sistemas de tempo real
+          que precisam de inferência em microssegundos.</li>
+      <li><strong>É necessária interpretabilidade</strong> — em medicina e finanças,
+          modelos lineares permitem dizer "este peso indica que esta variável aumenta
+          o risco em X%".</li>
+      <li><strong>Dados são poucos</strong> — modelos lineares generalizam melhor que
+          redes profundas em datasets pequenos.</li>
+    </ul>
+
+    <h3>Onde você usa um perceptron sem saber</h3>
+    <ul>
+      <li><strong>Filtros de spam</strong> (Naive Bayes e regressão logística são primos do perceptron).</li>
+      <li><strong>Click-Through Rate em anúncios</strong> (regressão logística em larga escala).</li>
+      <li><strong>POS tagging</strong> em PLN clássico (averaged perceptron).</li>
+      <li><strong>Camada final de muitas redes profundas</strong> — sim, a última camada de classificação de um Transformer é basicamente um perceptron multi-classe!</li>
+    </ul>
+  </section>
+
+  <!-- ============ IMPLEMENTAÇÕES ============ -->
+  <section class="block" id="impl">
+    <h2><span class="num">11</span> Implementações famosas</h2>
+
+    <div class="impl">
+      <div class="iname">scikit-learn — <code>sklearn.linear_model.Perceptron</code></div>
+      <div class="idesc">Implementação canônica em Python, com suporte a regularização L1/L2 e treinamento on-line. Ideal para começar.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">PyTorch / TensorFlow — uma camada <code>nn.Linear(n, 1)</code> + ativação</div>
+      <div class="idesc">Em frameworks modernos, o perceptron é literalmente uma linha: <code>torch.nn.Linear(input_dim, 1)</code>. A "rede" mais simples possível.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">Vowpal Wabbit</div>
+      <div class="idesc">Biblioteca de John Langford (Microsoft Research) otimizada para perceptrons e regressão logística em escala industrial — bilhões de exemplos por segundo.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">NLTK averaged_perceptron_tagger</div>
+      <div class="idesc">O POS-tagger padrão do NLTK em Python usa averaged perceptron — bom, rápido e ainda muito usado em pipelines de PLN.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">Mark I Perceptron (1958)</div>
+      <div class="idesc">O hardware original construído por Rosenblatt. Está em exposição na Smithsonian Institution, em Washington D.C.</div>
+    </div>
+  </section>
+
+  <!-- ============ ARTIGOS ============ -->
+  <section class="block" id="artigos">
+    <h2><span class="num">12</span> Artigos seminais</h2>
+
+    <div class="papers">
+      <div class="paper">
+        <span class="pyear">1943</span><span class="ptitle">A Logical Calculus of the Ideas Immanent in Nervous Activity</span><br>
+        <span class="pauthors">Warren S. McCulloch, Walter Pitts — Bulletin of Mathematical Biophysics, vol. 5</span>
+        <div class="psumm">Primeiro modelo matemático de neurônio. Mostrou que redes de neurônios binários podem implementar qualquer função lógica.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">1949</span><span class="ptitle">The Organization of Behavior</span><br>
+        <span class="pauthors">Donald O. Hebb — Wiley</span>
+        <div class="psumm">Propôs o princípio do aprendizado hebbiano: "neurons that fire together, wire together" — base teórica para aprendizado em redes.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">1958</span><span class="ptitle">The Perceptron: A Probabilistic Model for Information Storage and Organization in the Brain</span><br>
+        <span class="pauthors">Frank Rosenblatt — Psychological Review, vol. 65</span>
+        <div class="psumm">O artigo fundador. Introduz o perceptron como modelo de aprendizado e prova propriedades iniciais.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">1960</span><span class="ptitle">Adaptive Switching Circuits</span><br>
+        <span class="pauthors">Bernard Widrow, Marcian E. Hoff — IRE WESCON Convention Record</span>
+        <div class="psumm">Introduz o Adaline e a regra Widrow-Hoff (LMS), precursora direta do gradiente descendente moderno.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">1962</span><span class="ptitle">Principles of Neurodynamics</span><br>
+        <span class="pauthors">Frank Rosenblatt — Spartan Books</span>
+        <div class="psumm">Livro de referência de Rosenblatt. Discute perceptrons de múltiplas camadas e teoremas de convergência.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">1962</span><span class="ptitle">On Convergence Proofs on Perceptrons</span><br>
+        <span class="pauthors">Albert B. J. Novikoff — Symposium on Mathematical Theory of Automata</span>
+        <div class="psumm">Prova formal de convergência do perceptron para dados linearmente separáveis.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">1969</span><span class="ptitle">Perceptrons: An Introduction to Computational Geometry</span><br>
+        <span class="pauthors">Marvin Minsky, Seymour Papert — MIT Press</span>
+        <div class="psumm">Demonstrou as limitações dos perceptrons de camada única (incluindo o XOR). Causou o primeiro inverno da IA.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">1999</span><span class="ptitle">Large Margin Classification using the Perceptron Algorithm</span><br>
+        <span class="pauthors">Yoav Freund, Robert Schapire — Machine Learning, vol. 37</span>
+        <div class="psumm">Introduz o voted perceptron e fornece análises modernas com margens.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2002</span><span class="ptitle">Discriminative Training Methods for Hidden Markov Models</span><br>
+        <span class="pauthors">Michael Collins — EMNLP</span>
+        <div class="psumm">Mostrou que o averaged perceptron é altamente competitivo em PLN estruturado.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ APROFUNDAR ============ -->
+  <section class="block" id="aprofundar">
+    <h2><span class="num">13</span> Para se aprofundar</h2>
+
+    <h3>Livros</h3>
+    <ul>
+      <li><strong>Pattern Recognition and Machine Learning</strong> — Christopher Bishop (cap. 4)</li>
+      <li><strong>Neural Networks and Learning Machines</strong> — Simon Haykin (cap. 1-3)</li>
+      <li><strong>The Elements of Statistical Learning</strong> — Hastie, Tibshirani, Friedman (cap. 4)</li>
+    </ul>
+
+    <h3>Cursos online</h3>
+    <ul>
+      <li><strong>Stanford CS229</strong> (Andrew Ng) — Machine Learning, aulas iniciais</li>
+      <li><strong>fast.ai</strong> — From the Foundations</li>
+      <li><strong>Coursera Machine Learning</strong> — Andrew Ng</li>
+    </ul>
+
+    <h3>Demos interativas</h3>
+    <ul>
+      <li><strong>TensorFlow Playground</strong> — playground.tensorflow.org (visualize um perceptron e MLPs aprendendo em tempo real)</li>
+      <li><strong>Distill.pub</strong> — artigos visuais sobre fundamentos de redes neurais</li>
+    </ul>
+
+    <h3>Próximos passos na história</h3>
+    <p>
+      O perceptron é o ponto de partida. Para resolver suas limitações, surgiu o
+      <a href="mlp.html">MLP com Backpropagation</a>. Para problemas com estrutura
+      espacial, vieram as <a href="cnn.html">CNNs</a>. Para sequências, as
+      <a href="rnn.html">RNNs</a>. E para tudo ao mesmo tempo, os
+      <a href="transformer.html">Transformers</a>.
+    </p>
+  </section>
+
+  <a href="index.html" class="deeplink">
+    <span class="arrow">←</span>
+    <span class="dt">Próximo da história</span>
+    <span class="dn">Voltar ao índice geral</span>
+  </a>
+
+  <footer>
+    <p>Página detalhada · Perceptron · Parte do projeto <a href="index.html">Histórico de Evolução dos Modelos de IA</a></p>
+  </footer>
+</div>
+</body>
+</html>

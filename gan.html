@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GAN — Redes Adversariais — Página Detalhada</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <nav class="topnav">
+    <a href="index.html">← Voltar ao índice</a>
+    <span class="crumbs">Arquitetura · 2014</span>
+  </nav>
+
+  <header class="hero">
+    <div class="eyebrow">Duas redes em batalha · 2014 → 2021</div>
+    <h1>GAN — Redes Adversariais</h1>
+    <p class="lead">
+      Uma ideia tão simples que parece brincadeira: coloque duas redes para
+      <em>competir</em>. Uma cria falsificações, a outra tenta detectá-las.
+      Ambas melhoram juntas, e o resultado é um gerador capaz de produzir
+      imagens, áudios e dados sintéticos tão realistas que enganam até
+      especialistas.
+    </p>
+  </header>
+
+  <div class="toc">
+    <h4>Sumário</h4>
+    <ol>
+      <li><a href="#historia">A origem: a noite no bar</a></li>
+      <li><a href="#ideia">A ideia: gerador vs. discriminador</a></li>
+      <li><a href="#anatomia">Anatomia de uma GAN</a></li>
+      <li><a href="#treino">O ciclo de treino</a></li>
+      <li><a href="#perda">A função de perda minimax</a></li>
+      <li><a href="#problemas">Problemas conhecidos</a></li>
+      <li><a href="#dcgan">DCGAN — a primeira GAN estável</a></li>
+      <li><a href="#linhagem">A linhagem das GANs</a></li>
+      <li><a href="#stylegan">StyleGAN — rostos fotorealistas</a></li>
+      <li><a href="#cycleegan">CycleGAN — tradução sem pares</a></li>
+      <li><a href="#cgan">GANs condicionais</a></li>
+      <li><a href="#substitutos">A queda: a era da difusão</a></li>
+      <li><a href="#impl">Implementações</a></li>
+      <li><a href="#artigos">Artigos seminais</a></li>
+      <li><a href="#aprofundar">Para se aprofundar</a></li>
+    </ol>
+  </div>
+
+  <!-- ============ HISTÓRIA ============ -->
+  <section class="block" id="historia">
+    <h2><span class="num">1</span> A origem: a noite no bar</h2>
+
+    <p>
+      A história é famosa. Em uma noite de 2014, em Montreal, o jovem
+      pesquisador <strong>Ian Goodfellow</strong> estava conversando com colegas
+      num bar sobre as dificuldades de modelos generativos. Alguém lamentou que
+      seria preciso uma rede neural <em>capaz de criticar a si mesma</em>.
+      Goodfellow teve um <em>insight</em>: <em>"E se eu colocar duas redes para
+      competir?"</em>
+    </p>
+
+    <p>
+      Ele foi para casa, codou a ideia naquela mesma noite, e em algumas horas
+      tinha imagens geradas que funcionavam. O paper "Generative Adversarial
+      Nets" foi submetido para NeurIPS 2014 e virou um dos mais influentes da
+      década.
+    </p>
+
+    <div class="callout">
+      <span class="tag">Curiosidade</span>
+      <p>
+        Yann LeCun chamou as GANs de "a ideia mais legal dos últimos 10 anos em
+        machine learning" em 2016. E ele tinha razão: entre 2014 e 2021, GANs
+        dominaram a geração de imagens.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ IDEIA ============ -->
+  <section class="block" id="ideia">
+    <h2><span class="num">2</span> A ideia: gerador vs. discriminador</h2>
+
+    <p>
+      A GAN tem dois jogadores:
+    </p>
+    <ul>
+      <li><strong>Gerador G</strong> — recebe ruído aleatório z e produz uma amostra G(z). Sua missão: criar dados tão realistas que enganem D.</li>
+      <li><strong>Discriminador D</strong> — recebe uma amostra (real ou falsa) e prevê sua probabilidade de ser real. Sua missão: distinguir o verdadeiro do falso.</li>
+    </ul>
+
+    <p>
+      Treinamos ambos simultaneamente em um <strong>jogo minimax</strong>:
+    </p>
+    <ul>
+      <li>D quer <em>maximizar</em> sua capacidade de distinguir.</li>
+      <li>G quer <em>minimizar</em> a capacidade de D (enganando-o).</li>
+    </ul>
+
+    <p>
+      No equilíbrio teórico, G produz amostras indistinguíveis dos dados reais,
+      e D fica em 50% — chuta cara ou coroa.
+    </p>
+
+    <div class="analogy">
+      <span class="tag">Analogia 1 · falsário e detetive</span>
+      <p>
+        Pense numa eterna disputa entre um falsário de quadros e um detetive de
+        arte. O falsário pinta réplicas; o detetive examina obras e diz se são
+        autênticas. A cada rodada, o detetive aprende a detectar imperfeições
+        novas, e o falsário aprende a evitá-las. Depois de mil rodadas, as
+        falsificações são tão boas que até especialistas se enganariam — só
+        que aqui ambos são "inteligências automatizadas" cujo treino dura
+        milhões de iterações.
+      </p>
+    </div>
+
+    <div class="analogy">
+      <span class="tag">Analogia 2 · professor e aluno</span>
+      <p>
+        Imagine um aluno estudando para um exame oral. O professor faz perguntas
+        cada vez mais difíceis (discriminador). O aluno se prepara cada vez
+        melhor (gerador). Ao final, o aluno sabe tanto quanto o professor —
+        e o professor já não consegue mais o pegar de surpresa.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ ANATOMIA ============ -->
+  <section class="block" id="anatomia">
+    <h2><span class="num">3</span> Anatomia de uma GAN</h2>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg">
+        <!-- ruído -->
+        <rect x="20" y="60" width="80" height="60" rx="8" fill="#1f2952" stroke="#7aa2ff" stroke-width="2"/>
+        <text x="60" y="95" text-anchor="middle" class="svg-text">ruído z</text>
+        <text x="60" y="135" text-anchor="middle" class="svg-label">N(0, I)</text>
+
+        <!-- gerador -->
+        <polygon points="130,40 270,80 270,140 130,180" fill="#b07aff" opacity="0.9"/>
+        <text x="200" y="105" text-anchor="middle" fill="#fff" font-weight="700">Gerador G</text>
+        <text x="200" y="125" text-anchor="middle" fill="#fff" font-size="11">cria amostras fake</text>
+
+        <!-- imagem falsa -->
+        <rect x="300" y="60" width="80" height="60" rx="8" fill="#5d3aa8" stroke="#b07aff"/>
+        <text x="340" y="95" text-anchor="middle" fill="#fff" font-size="12">fake</text>
+
+        <!-- imagem real -->
+        <rect x="300" y="200" width="80" height="60" rx="8" fill="#0a3a36" stroke="#4fd1c5"/>
+        <text x="340" y="235" text-anchor="middle" fill="#fff" font-size="12">real</text>
+        <text x="340" y="280" text-anchor="middle" class="svg-label">dos dados de treino</text>
+
+        <!-- discriminador -->
+        <rect x="430" y="120" width="160" height="80" rx="10" fill="#ff7a90" opacity="0.9"/>
+        <text x="510" y="155" text-anchor="middle" fill="#fff" font-weight="700">Discriminador D</text>
+        <text x="510" y="175" text-anchor="middle" fill="#fff" font-size="11">real ou fake?</text>
+
+        <line x1="380" y1="90"  x2="430" y2="150" stroke="#4fd1c5" stroke-width="2"/>
+        <line x1="380" y1="230" x2="430" y2="170" stroke="#4fd1c5" stroke-width="2"/>
+
+        <!-- saída -->
+        <rect x="620" y="135" width="100" height="50" rx="8" fill="#4fd1c5" opacity="0.85"/>
+        <text x="670" y="165" text-anchor="middle" fill="#0b1020" font-weight="700">p ∈ [0,1]</text>
+        <line x1="590" y1="160" x2="620" y2="160" stroke="#4fd1c5" stroke-width="2"/>
+
+        <!-- feedback -->
+        <path d="M430 130 Q 320 35 200 80" stroke="#ffb86b" stroke-width="2" stroke-dasharray="6 4" fill="none" marker-end="url(#arrG)"/>
+        <text x="280" y="20" fill="#ffb86b" font-size="12" font-weight="700">gradiente de D treina G a enganar melhor</text>
+
+        <defs>
+          <marker id="arrG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#ffb86b"/></marker>
+        </defs>
+      </svg>
+      <div class="caption">Diagrama da GAN. G recebe ruído e gera fake. D classifica real vs. fake. Os gradientes treinam ambos.</div>
+    </div>
+
+    <h3>O Gerador (G)</h3>
+    <p>
+      Tipicamente uma rede que começa com um vetor de ruído de baixa dimensão
+      (digamos, 100) e expande para a dimensão da imagem (224×224×3) através de
+      <strong>convoluções transpostas</strong> (também chamadas de
+      "deconvoluções"). É como inflar um balão a partir de uma semente.
+    </p>
+
+    <h3>O Discriminador (D)</h3>
+    <p>
+      Tipicamente uma CNN clássica: recebe imagem, passa por convoluções e
+      poolings, termina em uma única saída sigmoid (probabilidade de ser real).
+      Estruturalmente, é um classificador binário comum.
+    </p>
+  </section>
+
+  <!-- ============ TREINO ============ -->
+  <section class="block" id="treino">
+    <h2><span class="num">4</span> O ciclo de treino</h2>
+
+    <p>
+      A cada passo de treino, alternamos:
+    </p>
+
+    <h4>Passo 1: treina o discriminador</h4>
+    <ol>
+      <li>Pegue um lote de imagens <em>reais</em> x do dataset.</li>
+      <li>Gere um lote de imagens <em>fake</em>: G(z) com z ~ N(0, I).</li>
+      <li>Atualize D para classificar corretamente: D(x) → 1, D(G(z)) → 0.</li>
+    </ol>
+
+    <h4>Passo 2: treina o gerador</h4>
+    <ol>
+      <li>Gere um lote de fake: G(z).</li>
+      <li>Atualize G para que D(G(z)) → 1 (G quer enganar D).</li>
+      <li>Importante: <em>os pesos de D ficam congelados</em> nesse passo.</li>
+    </ol>
+
+    <p>
+      Repete até a convergência (que pode levar horas, dias ou semanas).
+    </p>
+
+    <div class="tip">
+      <span class="tag">Detalhe técnico</span>
+      <p>
+        Treinar D e G na mesma proporção (1:1) é comum, mas algumas variantes
+        treinam D mais (k passos de D para cada passo de G), especialmente em
+        WGAN. O ajuste é parte da arte.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ PERDA ============ -->
+  <section class="block" id="perda">
+    <h2><span class="num">5</span> A função de perda minimax</h2>
+
+    <div class="formula">
+      <div class="fname">Objetivo minimax (Goodfellow, 2014)</div>
+      min_G max_D V(D, G) = 𝔼ₓ[log D(x)] + 𝔼ᵤ[log(1 − D(G(z)))]
+    </div>
+
+    <p>
+      Lendo a fórmula:
+    </p>
+    <ul>
+      <li>D quer maximizar log D(x) (corretamente classificar reais) <em>e</em> log(1−D(G(z))) (corretamente rejeitar fakes).</li>
+      <li>G só pode controlar o segundo termo. Quer minimizá-lo, ou equivalentemente, maximizar D(G(z)) (enganar D).</li>
+    </ul>
+
+    <h3>O problema do gradiente saturado</h3>
+    <p>
+      No início do treino, G é ruim — D facilmente o rejeita (D(G(z)) ≈ 0), e
+      log(1 − D(G(z))) tem gradiente quase nulo. G mal aprende.
+    </p>
+    <p>
+      Solução prática (já no paper original): G maximiza <strong>log D(G(z))</strong>
+      em vez de minimizar log(1 − D(G(z))). Matematicamente equivalente no
+      ponto ótimo, mas com gradientes muito melhores.
+    </p>
+
+    <h3>Wasserstein GAN (Arjovsky, 2017)</h3>
+    <p>
+      Em vez de cross-entropy, usa a <strong>distância de Wasserstein</strong>
+      (também chamada de "earth mover's distance"). Resulta em treino muito
+      mais estável e perda que é uma medida real de qualidade.
+    </p>
+  </section>
+
+  <!-- ============ PROBLEMAS ============ -->
+  <section class="block" id="problemas">
+    <h2><span class="num">6</span> Problemas conhecidos</h2>
+
+    <h3>Mode collapse</h3>
+    <p>
+      G descobre uma única amostra que engana D consistentemente e fica
+      repetindo só ela. Em vez de gerar a diversidade de um dataset, gera
+      "o gato perfeito" e nada mais.
+    </p>
+
+    <div class="analogy">
+      <span class="tag">Analogia · mode collapse</span>
+      <p>
+        Imagine um aluno que descobriu uma resposta padrão ("a guerra fria") que
+        sempre tira nota 7. Em vez de estudar todo o conteúdo, ele responde isso
+        para qualquer pergunta. Tira 7 em todas, mas não aprende nada. Esse é o
+        gerador entrando em mode collapse.
+      </p>
+    </div>
+
+    <h3>Treino instável</h3>
+    <p>
+      G e D estão num jogo dinâmico. Se um fica muito melhor que o outro
+      rapidamente, o treino pode oscilar para sempre ou divergir.
+    </p>
+
+    <h3>Avaliação difícil</h3>
+    <p>
+      Não há uma perda absoluta que mede qualidade. Métricas como
+      <strong>Inception Score</strong> e <strong>FID (Fréchet Inception Distance)</strong>
+      são proxies imperfeitas.
+    </p>
+
+    <h3>Vanishing gradient</h3>
+    <p>
+      Se D fica perfeito muito cedo, G não recebe gradiente útil. Daí variantes
+      como WGAN serem necessárias.
+    </p>
+
+    <h3>Soluções práticas</h3>
+    <ul>
+      <li>Batch normalization (mas em decoders pode causar problemas — usa-se PixelNorm).</li>
+      <li>Spectral normalization (Miyato, 2018).</li>
+      <li>Two Time-scale Update Rule (TTUR) — taxa de aprendizado diferente para G e D.</li>
+      <li>Mini-batch discrimination.</li>
+      <li>Label smoothing.</li>
+      <li>Progressive growing (Karras, 2018).</li>
+    </ul>
+  </section>
+
+  <!-- ============ DCGAN ============ -->
+  <section class="block" id="dcgan">
+    <h2><span class="num">7</span> DCGAN — a primeira GAN estável</h2>
+
+    <p>
+      O paper original de Goodfellow usava MLPs simples. Em 2015,
+      <strong>Alec Radford</strong>, <strong>Luke Metz</strong> e
+      <strong>Soumith Chintala</strong> publicaram <strong>DCGAN</strong>
+      (Deep Convolutional GAN), com uma série de diretrizes arquiteturais
+      que estabilizaram o treino:
+    </p>
+
+    <ul>
+      <li>Use convoluções strided (sem pooling).</li>
+      <li>Use batch normalization em G e D (exceto última camada de G e primeira de D).</li>
+      <li>Use LeakyReLU em D, ReLU em G (exceto a saída, que é Tanh).</li>
+      <li>Use Adam como otimizador, com lr=0,0002 e beta1=0,5.</li>
+    </ul>
+
+    <p>
+      DCGAN também demonstrou propriedades surpreendentes do espaço latente:
+      vetores de "homem com óculos" − "homem sem óculos" + "mulher sem óculos" ≈
+      "mulher com óculos". Aritmética em z funcionava.
+    </p>
+  </section>
+
+  <!-- ============ LINHAGEM ============ -->
+  <section class="block" id="linhagem">
+    <h2><span class="num">8</span> A linhagem das GANs</h2>
+
+    <table class="compare">
+      <thead><tr><th>Ano</th><th>Nome</th><th>Inovação</th></tr></thead>
+      <tbody>
+        <tr><td>2014</td><td>GAN</td><td>Goodfellow et al. — paper original</td></tr>
+        <tr><td>2014</td><td>cGAN</td><td>Condicional: G(z, y) e D(x, y)</td></tr>
+        <tr><td>2015</td><td>DCGAN</td><td>Convolutional, com diretrizes de estabilidade</td></tr>
+        <tr><td>2016</td><td>InfoGAN</td><td>Latente desentrelaçado</td></tr>
+        <tr><td>2017</td><td>WGAN</td><td>Distância de Wasserstein, treino estável</td></tr>
+        <tr><td>2017</td><td>Pix2Pix</td><td>Image-to-image com pares</td></tr>
+        <tr><td>2017</td><td>CycleGAN</td><td>Image-to-image sem pares (foto ↔ pintura)</td></tr>
+        <tr><td>2017</td><td>ProGAN</td><td>Progressive growing para alta resolução</td></tr>
+        <tr><td>2018</td><td>BigGAN</td><td>Geração condicional em larga escala (ImageNet 512×512)</td></tr>
+        <tr><td>2019</td><td>StyleGAN</td><td>Controle de estilo separado em diferentes resoluções</td></tr>
+        <tr><td>2020</td><td>StyleGAN2</td><td>Correções de artefatos do StyleGAN</td></tr>
+        <tr><td>2021</td><td>StyleGAN3</td><td>Equivariância a translação e rotação</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ STYLEGAN ============ -->
+  <section class="block" id="stylegan">
+    <h2><span class="num">9</span> StyleGAN — rostos fotorealistas</h2>
+
+    <p>
+      Em 2018-2019, a NVIDIA (Tero Karras et al.) publicou
+      <strong>ProGAN</strong> e <strong>StyleGAN</strong>, levando a geração de
+      rostos a um nível assustadoramente realista. O site
+      <em>thispersondoesnotexist.com</em> mostra exemplos a cada refresh:
+      rostos perfeitos de pessoas que nunca existiram.
+    </p>
+
+    <h3>Inovações do StyleGAN</h3>
+    <ul>
+      <li><strong>Mapping network</strong>: o latente z passa por uma MLP para virar w, mais "desentrelaçado".</li>
+      <li><strong>AdaIN (Adaptive Instance Normalization)</strong>: aplica w em diferentes resoluções, controlando "estilo" em diferentes níveis (pose grossa → detalhes finos).</li>
+      <li><strong>Noise injection</strong>: ruído estocástico em cada camada para variações finas (cabelos, sardas).</li>
+      <li><strong>Progressive growing</strong>: treina primeiro em 4×4, depois 8×8, ..., até 1024×1024.</li>
+    </ul>
+
+    <h3>Controle de atributos</h3>
+    <p>
+      Como o w é desentrelaçado, é possível encontrar direções no espaço
+      latente que controlam atributos específicos: idade, sorriso, gênero,
+      tamanho do cabelo. Editar w nessa direção edita a foto preservando o
+      resto.
+    </p>
+  </section>
+
+  <!-- ============ CYCLEGAN ============ -->
+  <section class="block" id="cycleegan">
+    <h2><span class="num">10</span> CycleGAN — tradução sem pares</h2>
+
+    <p>
+      Pix2Pix precisa de pares emparelhados (foto + pintura correspondente da
+      mesma cena). Mas conseguir esses pares é caro ou impossível. CycleGAN
+      (Zhu et al., 2017) resolve treinando dois geradores G e F simultâneos,
+      e impondo um <strong>cycle-consistency loss</strong>:
+    </p>
+
+    <div class="formula">
+      F(G(x)) ≈ x  e  G(F(y)) ≈ y
+    </div>
+
+    <p>
+      Ou seja: traduza foto → pintura → foto, e deve voltar ao original.
+      Resultado: traduções de domínios sem precisar pareamento — cavalos ↔
+      zebras, fotos ↔ Monet, dia ↔ noite.
+    </p>
+  </section>
+
+  <!-- ============ CGAN ============ -->
+  <section class="block" id="cgan">
+    <h2><span class="num">11</span> GANs condicionais</h2>
+
+    <p>
+      Em uma GAN normal, você não controla o que G gera — só amostra ruído. A
+      <strong>cGAN</strong> (Mirza &amp; Osindero, 2014) acrescenta uma
+      <em>condição y</em>: G(z, y) e D(x, y). Y pode ser:
+    </p>
+    <ul>
+      <li>Um rótulo de classe (gerar "carros", "gatos", "rostos").</li>
+      <li>Uma descrição textual (text-to-image — primeiros experimentos).</li>
+      <li>Outra imagem (image-to-image translation — Pix2Pix).</li>
+      <li>Um esqueleto de pose (gerar pessoa nessa pose).</li>
+    </ul>
+    <p>
+      cGANs foram o backbone de muitas aplicações práticas: colorização de
+      fotos antigas, super-resolução, sketch-to-photo, deepfakes.
+    </p>
+  </section>
+
+  <!-- ============ SUBSTITUTOS ============ -->
+  <section class="block" id="substitutos">
+    <h2><span class="num">12</span> A queda: a era da difusão</h2>
+
+    <p>
+      A partir de 2021-2022, GANs começaram a ser substituídas em geração de
+      imagens por <strong>modelos de difusão</strong> (DDPM, Stable Diffusion,
+      DALL-E 2, Midjourney, Imagen). Por quê?
+    </p>
+
+    <ul>
+      <li><strong>Treino mais estável</strong> — sem o jogo adversarial, não há mode collapse.</li>
+      <li><strong>Maior diversidade</strong> — difusão cobre melhor a distribuição completa.</li>
+      <li><strong>Melhor controle por texto</strong> — fácil condicionar em texto via classifier-free guidance.</li>
+      <li><strong>Escalabilidade</strong> — difusão escala bem com dados e compute.</li>
+    </ul>
+
+    <h3>O que sobrou para GANs</h3>
+    <ul>
+      <li><strong>Velocidade de inferência</strong> — GANs geram em 1 forward pass; difusão precisa de 20-1000 passos.</li>
+      <li><strong>Edição de imagens em tempo real</strong> — StyleGAN ainda lidera quando latência importa.</li>
+      <li><strong>Domínios específicos</strong> — rostos em alta resolução, certos tipos de geração de áudio.</li>
+      <li><strong>Imagens de alta qualidade em datasets restritos</strong> — quando há poucos dados.</li>
+    </ul>
+
+    <p>
+      GANs <em>não</em> morreram — são uma ferramenta no cinturão de utilidades
+      do gerativismo. Mas o trono atual é dos modelos de difusão.
+    </p>
+  </section>
+
+  <!-- ============ IMPL ============ -->
+  <section class="block" id="impl">
+    <h2><span class="num">13</span> Implementações</h2>
+
+    <div class="impl">
+      <div class="iname">PyTorch — DCGAN tutorial oficial</div>
+      <div class="idesc">Excelente ponto de partida: ~200 linhas, MNIST e CelebA.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">StyleGAN2-ADA (NVIDIA)</div>
+      <div class="idesc">Implementação oficial, com Adaptive Discriminator Augmentation para datasets pequenos.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">StyleGAN3 (NVIDIA)</div>
+      <div class="idesc">Última iteração da família StyleGAN, com equivariância.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">CycleGAN/Pix2Pix (PyTorch oficial)</div>
+      <div class="idesc">Repositório de Jun-Yan Zhu, padrão para image-to-image.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">BigGAN (Google)</div>
+      <div class="idesc">Modelos disponíveis no TF Hub para inferência. Treino requer infraestrutura massiva.</div>
+    </div>
+  </section>
+
+  <!-- ============ ARTIGOS ============ -->
+  <section class="block" id="artigos">
+    <h2><span class="num">14</span> Artigos seminais</h2>
+    <div class="papers">
+      <div class="paper">
+        <span class="pyear">2014</span><span class="ptitle">Generative Adversarial Nets</span><br>
+        <span class="pauthors">Ian Goodfellow, Jean Pouget-Abadie, Mehdi Mirza, Bing Xu, David Warde-Farley, Sherjil Ozair, Aaron Courville, Yoshua Bengio — NeurIPS</span>
+        <div class="psumm">O paper fundador.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2014</span><span class="ptitle">Conditional Generative Adversarial Nets</span><br>
+        <span class="pauthors">Mehdi Mirza, Simon Osindero</span>
+        <div class="psumm">Introduz a versão condicional.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2015</span><span class="ptitle">Unsupervised Representation Learning with Deep Convolutional Generative Adversarial Networks (DCGAN)</span><br>
+        <span class="pauthors">Alec Radford, Luke Metz, Soumith Chintala</span>
+        <div class="psumm">Diretrizes que estabilizaram o treino de GANs convolutivas.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2017</span><span class="ptitle">Wasserstein GAN (WGAN)</span><br>
+        <span class="pauthors">Martin Arjovsky, Soumith Chintala, Léon Bottou</span>
+        <div class="psumm">Substitui cross-entropy pela distância de Wasserstein. Treino muito mais estável.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2017</span><span class="ptitle">Image-to-Image Translation with Conditional Adversarial Networks (Pix2Pix)</span><br>
+        <span class="pauthors">Phillip Isola, Jun-Yan Zhu, Tinghui Zhou, Alexei Efros — CVPR</span>
+        <div class="psumm">Tradução de imagem para imagem.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2017</span><span class="ptitle">Unpaired Image-to-Image Translation using Cycle-Consistent Adversarial Networks (CycleGAN)</span><br>
+        <span class="pauthors">Jun-Yan Zhu, Taesung Park, Phillip Isola, Alexei Efros — ICCV</span>
+        <div class="psumm">Tradução sem pares emparelhados.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2018</span><span class="ptitle">Progressive Growing of GANs for Improved Quality, Stability, and Variation (ProGAN)</span><br>
+        <span class="pauthors">Tero Karras et al. — NVIDIA — ICLR</span>
+        <div class="psumm">Treina em resoluções progressivas.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2018</span><span class="ptitle">Large Scale GAN Training for High Fidelity Natural Image Synthesis (BigGAN)</span><br>
+        <span class="pauthors">Andrew Brock, Jeff Donahue, Karen Simonyan — ICLR</span>
+        <div class="psumm">Demonstra que escala importa.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2019</span><span class="ptitle">A Style-Based Generator Architecture for Generative Adversarial Networks (StyleGAN)</span><br>
+        <span class="pauthors">Tero Karras, Samuli Laine, Timo Aila — NVIDIA — CVPR</span>
+        <div class="psumm">Marco da geração de rostos fotorealistas.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2020</span><span class="ptitle">Analyzing and Improving the Image Quality of StyleGAN (StyleGAN2)</span><br>
+        <span class="pauthors">Karras et al.</span>
+        <div class="psumm">Corrige artefatos do StyleGAN original.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2021</span><span class="ptitle">Alias-Free Generative Adversarial Networks (StyleGAN3)</span><br>
+        <span class="pauthors">Karras et al.</span>
+        <div class="psumm">Equivariância a translação e rotação.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ APROFUNDAR ============ -->
+  <section class="block" id="aprofundar">
+    <h2><span class="num">15</span> Para se aprofundar</h2>
+
+    <ul>
+      <li><strong>Goodfellow — NIPS 2016 Tutorial on GANs</strong>: o melhor material introdutório, pelo próprio criador.</li>
+      <li><strong>Soumith Chintala — "How to Train a GAN"</strong>: receitas práticas indispensáveis.</li>
+      <li><strong>fast.ai Lesson on GANs</strong>: implementação passo a passo.</li>
+      <li><strong>thispersondoesnotexist.com</strong> — para ver StyleGAN em ação.</li>
+    </ul>
+  </section>
+
+  <a href="seq2seq.html" class="deeplink">
+    <span class="arrow">→</span>
+    <span class="dt">Próxima arquitetura</span>
+    <span class="dn">Seq2Seq + Attention</span>
+  </a>
+
+  <footer>
+    <p>Página detalhada · GAN · Parte do projeto <a href="index.html">Histórico de Evolução dos Modelos de IA</a></p>
+  </footer>
+</div>
+</body>
+</html>

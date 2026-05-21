@@ -336,6 +336,27 @@
   }
   footer a { color: var(--accent); text-decoration: none; }
 
+  /* ============ DEEPLINK ============ */
+  .deeplink {
+    display: block;
+    margin-top: 28px;
+    padding: 18px 22px;
+    background: linear-gradient(135deg, rgba(122,162,255,0.15), rgba(176,122,255,0.18));
+    border: 1px solid var(--accent);
+    border-radius: 12px;
+    color: var(--ink);
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
+  .deeplink:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(122,162,255,0.18);
+  }
+  .deeplink .dt { display: block; color: var(--accent-3); font-size: 12px; letter-spacing: 2px; text-transform: uppercase; font-weight: 700; margin-bottom: 4px; }
+  .deeplink .dn { font-size: 17px; }
+  .deeplink .arrow { float: right; font-size: 22px; color: var(--accent); }
+
   /* ============ SVG STYLES ============ */
   .svg-bg { fill: #0f1530; }
   .svg-node-fill { fill: #1f2952; }
@@ -473,6 +494,12 @@
       (3) funcionamento técnico, (4) diagrama, (5) prós e contras, e (6) os artigos seminais.
       Comece pelo Perceptron e siga em ordem — você verá cada inovação como uma resposta natural
       ao gargalo da arquitetura anterior.
+    </p>
+
+    <p style="margin-top: 18px;">
+      <strong>No fim de cada aba</strong> você encontrará um link para uma página dedicada à
+      arquitetura, com explicações muito mais detalhadas, diagramas adicionais, exemplos de
+      código, e uma lista extensa de artigos e implementações.
     </p>
   </section>
 
@@ -612,6 +639,12 @@
         <span class="pauthors">Marvin Minsky, Seymour Papert — MIT Press</span>
       </div>
     </div>
+
+    <a href="perceptron.html" class="deeplink">
+      <span class="arrow">→</span>
+      <span class="dt">Página completa</span>
+      <span class="dn">Perceptron — explicação detalhada, diagramas, exemplos de código e mais artigos</span>
+    </a>
   </section>
 
   <!-- ============ PANEL: MLP ============ -->
@@ -764,6 +797,12 @@
         <span class="pauthors">Kurt Hornik — Neural Networks</span>
       </div>
     </div>
+
+    <a href="mlp.html" class="deeplink">
+      <span class="arrow">→</span>
+      <span class="dt">Página completa</span>
+      <span class="dn">MLP + Backpropagation — explicação detalhada, fórmulas, código e mais artigos</span>
+    </a>
   </section>
 
   <!-- ============ PANEL: CNN ============ -->
@@ -932,6 +971,12 @@
         <span class="pauthors">Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun — CVPR</span>
       </div>
     </div>
+
+    <a href="cnn.html" class="deeplink">
+      <span class="arrow">→</span>
+      <span class="dt">Página completa</span>
+      <span class="dn">CNN — Redes Convolucionais: convolução, pooling, hierarquia, ImageNet, ResNet e mais</span>
+    </a>
   </section>
 
   <!-- ============ PANEL: RNN ============ -->
@@ -1086,6 +1131,12 @@
         <span class="pauthors">Yoshua Bengio, Patrice Simard, Paolo Frasconi — IEEE Trans. on NN</span>
       </div>
     </div>
+
+    <a href="rnn.html" class="deeplink">
+      <span class="arrow">→</span>
+      <span class="dt">Página completa</span>
+      <span class="dn">RNN — Redes Recorrentes: anatomia, BPTT, topologias, bidirectional, char-RNN e mais</span>
+    </a>
   </section>
 
   <!-- ============ PANEL: LSTM ============ -->
@@ -1230,6 +1281,12 @@
         <span class="pauthors">Klaus Greff et al. — análise sistemática das variantes</span>
       </div>
     </div>
+
+    <a href="lstm.html" class="deeplink">
+      <span class="arrow">→</span>
+      <span class="dt">Página completa</span>
+      <span class="dn">LSTM e GRU — anatomia detalhada da célula, portões, equações, GNMT e mais</span>
+    </a>
   </section>
 
   <!-- ============ PANEL: AUTOENCODER ============ -->
@@ -1357,6 +1414,12 @@
         <span class="pauthors">Diederik Kingma, Max Welling — ICLR</span>
       </div>
     </div>
+
+    <a href="autoencoder.html" class="deeplink">
+      <span class="arrow">→</span>
+      <span class="dt">Página completa</span>
+      <span class="dn">Autoencoders e VAE — tipos, denoising, sparse, VAE, VQ-VAE e geração latente</span>
+    </a>
   </section>
 
   <!-- ============ PANEL: GAN ============ -->
@@ -1491,6 +1554,12 @@
         <span class="pauthors">Tero Karras, Samuli Laine, Timo Aila — NVIDIA</span>
       </div>
     </div>
+
+    <a href="gan.html" class="deeplink">
+      <span class="arrow">→</span>
+      <span class="dt">Página completa</span>
+      <span class="dn">GAN — gerador vs discriminador, DCGAN, StyleGAN, CycleGAN, e a era da difusão</span>
+    </a>
   </section>
 
   <!-- ============ PANEL: SEQ2SEQ ============ -->
@@ -1622,6 +1691,12 @@
         <span class="pauthors">Minh-Thang Luong, Hieu Pham, Christopher Manning — EMNLP</span>
       </div>
     </div>
+
+    <a href="seq2seq.html" class="deeplink">
+      <span class="arrow">→</span>
+      <span class="dt">Página completa</span>
+      <span class="dn">Seq2Seq + Attention — encoder-decoder, atenção de Bahdanau, beam search e mais</span>
+    </a>
   </section>
 
   <!-- ============ PANEL: TRANSFORMER ============ -->
@@ -1810,6 +1885,12 @@
         <span class="pauthors">Alexey Dosovitskiy et al. — Google</span>
       </div>
     </div>
+
+    <a href="transformer.html" class="deeplink">
+      <span class="arrow">→</span>
+      <span class="dt">Página completa</span>
+      <span class="dn">Transformer — Q/K/V, multi-head, positional encoding, encoder, decoder e variantes</span>
+    </a>
   </section>
 
   <!-- ============ PANEL: LLMs ============ -->
@@ -1979,6 +2060,12 @@
       — mas variantes como Mamba (state-space models) já começam a desafiar seu reinado em sequências
       muito longas.
     </p>
+
+    <a href="llm.html" class="deeplink">
+      <span class="arrow">→</span>
+      <span class="dt">Página completa</span>
+      <span class="dn">LLMs Modernos — pré-treino, SFT, RLHF, Constitutional AI, agentes e o futuro</span>
+    </a>
   </section>
 
   <footer>

@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RNN — Redes Recorrentes — Página Detalhada</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <nav class="topnav">
+    <a href="index.html">← Voltar ao índice</a>
+    <span class="crumbs">Arquitetura · anos 80-90</span>
+  </nav>
+
+  <header class="hero">
+    <div class="eyebrow">Quando as redes ganharam memória · 1982 → 1997</div>
+    <h1>RNN — Redes Recorrentes</h1>
+    <p class="lead">
+      Para ler uma frase ou ouvir uma música, a ordem importa. Para a maioria
+      das redes, não. As RNNs foram a primeira família a tratar o tempo
+      como cidadão de primeira classe — alimentando sua própria saída como
+      entrada do próximo passo, criando assim uma <em>memória interna</em>.
+    </p>
+  </header>
+
+  <div class="toc">
+    <h4>Sumário</h4>
+    <ol>
+      <li><a href="#contexto">Por que sequências exigem outra arquitetura</a></li>
+      <li><a href="#ideia">A grande ideia: o laço temporal</a></li>
+      <li><a href="#anatomia">Anatomia de uma RNN</a></li>
+      <li><a href="#desenrolar">Desenrolando no tempo</a></li>
+      <li><a href="#bptt">Treinamento com BPTT</a></li>
+      <li><a href="#vanishing">O problema dos gradientes que somem</a></li>
+      <li><a href="#topologias">Topologias: many-to-one, one-to-many, etc.</a></li>
+      <li><a href="#bidirecional">RNNs bidirecionais</a></li>
+      <li><a href="#exemplo">Exemplo: gerando texto caractere a caractere</a></li>
+      <li><a href="#aplicacoes">Aplicações clássicas</a></li>
+      <li><a href="#sucessoras">Sucessoras: LSTM, GRU, Transformer</a></li>
+      <li><a href="#impl">Implementações</a></li>
+      <li><a href="#artigos">Artigos seminais</a></li>
+      <li><a href="#aprofundar">Para se aprofundar</a></li>
+    </ol>
+  </div>
+
+  <!-- ============ CONTEXTO ============ -->
+  <section class="block" id="contexto">
+    <h2><span class="num">1</span> Por que sequências exigem outra arquitetura</h2>
+
+    <p>
+      Considere as frases:
+    </p>
+    <ul>
+      <li>"O cachorro mordeu o homem"</li>
+      <li>"O homem mordeu o cachorro"</li>
+    </ul>
+    <p>
+      As palavras são idênticas, mas o significado é completamente diferente.
+      O que muda é a <strong>ordem</strong>. Uma MLP que recebe os tokens como
+      um vetor sem ordem trata as duas frases como iguais — impossível distinguir.
+    </p>
+    <p>
+      Outros exemplos onde a ordem importa:
+    </p>
+    <ul>
+      <li><strong>Áudio</strong> — uma melodia depende de quais notas vêm antes e depois.</li>
+      <li><strong>Vídeo</strong> — um filme é uma sequência de imagens; saber o que veio antes ajuda a entender o que aparece.</li>
+      <li><strong>Séries temporais financeiras</strong> — o preço de hoje depende do de ontem.</li>
+      <li><strong>Genoma</strong> — sequências de ADN têm padrões posicionais.</li>
+    </ul>
+  </section>
+
+  <!-- ============ IDEIA ============ -->
+  <section class="block" id="ideia">
+    <h2><span class="num">2</span> A grande ideia: o laço temporal</h2>
+
+    <p>
+      A solução das RNNs é elegante: <strong>conectar a saída de um neurônio à
+      sua própria entrada</strong>, criando um laço. A cada passo de tempo, a
+      rede recebe a entrada do momento <em>e</em> sua própria saída do momento
+      anterior. Essa "memória" carrega o contexto.
+    </p>
+
+    <div class="analogy">
+      <span class="tag">Analogia 1 · contador de histórias</span>
+      <p>
+        Imagine alguém te contando uma história. A cada nova frase, ela
+        <em>lembra do que já foi dito</em>. Se a história começa com "era uma
+        vez, em um castelo...", você já cria expectativas. Quando aparece "o
+        príncipe entrou", você sabe quem é. A RNN mantém um "estado mental"
+        que se atualiza a cada palavra recebida.
+      </p>
+    </div>
+
+    <div class="analogy">
+      <span class="tag">Analogia 2 · diário pessoal</span>
+      <p>
+        Imagine que você escreve um diário em que cada nova página resume tudo
+        o que aconteceu antes, mais o que aconteceu hoje. A página de hoje é
+        o seu estado oculto. Amanhã, você pega a página de hoje e adiciona os
+        novos acontecimentos.
+      </p>
+    </div>
+
+    <div class="analogy">
+      <span class="tag">Analogia 3 · linha de produção</span>
+      <p>
+        Uma linha de produção em que cada estação repassa para a próxima um
+        "kit em progresso" e o próximo ingrediente. A última estação tem um
+        produto final que reflete <em>todos</em> os passos anteriores.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ ANATOMIA ============ -->
+  <section class="block" id="anatomia">
+    <h2><span class="num">3</span> Anatomia de uma RNN</h2>
+
+    <p>Uma célula RNN simples (Elman, 1990) tem três conjuntos de pesos:</p>
+    <ul>
+      <li><strong>Wₓₕ</strong> — pesos da entrada para o estado oculto</li>
+      <li><strong>Wₕₕ</strong> — pesos do estado anterior para o novo estado</li>
+      <li><strong>Wₕᵧ</strong> — pesos do estado para a saída</li>
+    </ul>
+
+    <div class="formula">
+      <div class="fname">Equações de uma RNN simples (Elman)</div>
+      hₜ = tanh(Wₕₕ · hₜ₋₁ + Wₓₕ · xₜ + bₕ)<br>
+      yₜ = Wₕᵧ · hₜ + bᵧ
+    </div>
+
+    <p>
+      O <strong>tanh</strong> mantém o estado oculto em um intervalo controlado
+      (−1, 1). Se você não normalizasse, ele explodiria após muitos passos.
+    </p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 480 280" xmlns="http://www.w3.org/2000/svg">
+        <!-- compact RNN -->
+        <text x="240" y="20" text-anchor="middle" class="svg-label">Forma compacta</text>
+        <rect x="180" y="80" width="120" height="80" rx="10" fill="#b07aff" opacity="0.85"/>
+        <text x="240" y="120" text-anchor="middle" fill="#fff" font-weight="700">RNN</text>
+        <text x="240" y="140" text-anchor="middle" fill="#fff" font-size="12">f(h, x)</text>
+
+        <!-- entrada -->
+        <text x="240" y="220" text-anchor="middle" class="svg-text">xₜ</text>
+        <path d="M240 200 L240 165" stroke="#4fd1c5" stroke-width="2" marker-end="url(#arrRC)"/>
+        <!-- saída -->
+        <text x="240" y="55" text-anchor="middle" class="svg-text">yₜ</text>
+        <path d="M240 75 L240 60" stroke="#4fd1c5" stroke-width="2" marker-end="url(#arrRC)"/>
+
+        <!-- loop -->
+        <path d="M300 100 C 360 100, 360 140, 300 140" stroke="#ffb86b" stroke-width="2.5" fill="none" marker-end="url(#arrRC2)"/>
+        <text x="375" y="125" fill="#ffb86b" font-weight="700">hₜ</text>
+
+        <defs>
+          <marker id="arrRC" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#4fd1c5"/></marker>
+          <marker id="arrRC2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#ffb86b"/></marker>
+        </defs>
+      </svg>
+      <div class="caption">A célula RNN compacta tem uma "alça" — a saída do estado oculto volta como entrada na próxima iteração.</div>
+    </div>
+  </section>
+
+  <!-- ============ DESENROLAR ============ -->
+  <section class="block" id="desenrolar">
+    <h2><span class="num">4</span> Desenrolando no tempo</h2>
+
+    <p>
+      Para entender o que a RNN faz com uma sequência inteira, é útil
+      <strong>desenrolar</strong> o laço — desenhar uma cópia da célula para
+      cada passo de tempo, conectando o estado oculto de uma para a próxima.
+      Os pesos são <em>compartilhados</em> entre todas as cópias.
+    </p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg">
+        <!-- células -->
+        <rect x="40"  y="100" width="100" height="60" rx="8" fill="#b07aff" opacity="0.85"/>
+        <text x="90"  y="135" text-anchor="middle" fill="#fff" font-weight="700">RNN</text>
+        <rect x="180" y="100" width="100" height="60" rx="8" fill="#b07aff" opacity="0.85"/>
+        <text x="230" y="135" text-anchor="middle" fill="#fff" font-weight="700">RNN</text>
+        <rect x="320" y="100" width="100" height="60" rx="8" fill="#b07aff" opacity="0.85"/>
+        <text x="370" y="135" text-anchor="middle" fill="#fff" font-weight="700">RNN</text>
+        <rect x="460" y="100" width="100" height="60" rx="8" fill="#b07aff" opacity="0.85"/>
+        <text x="510" y="135" text-anchor="middle" fill="#fff" font-weight="700">RNN</text>
+        <rect x="600" y="100" width="100" height="60" rx="8" fill="#b07aff" opacity="0.85"/>
+        <text x="650" y="135" text-anchor="middle" fill="#fff" font-weight="700">RNN</text>
+
+        <!-- pesos compartilhados -->
+        <text x="370" y="50" text-anchor="middle" fill="#ffb86b" font-weight="700">Os mesmos pesos (W) em todas as células!</text>
+
+        <!-- estado horizontal -->
+        <path d="M140 130 L180 130" stroke="#ffb86b" stroke-width="2" marker-end="url(#arrUR)"/>
+        <path d="M280 130 L320 130" stroke="#ffb86b" stroke-width="2" marker-end="url(#arrUR)"/>
+        <path d="M420 130 L460 130" stroke="#ffb86b" stroke-width="2" marker-end="url(#arrUR)"/>
+        <path d="M560 130 L600 130" stroke="#ffb86b" stroke-width="2" marker-end="url(#arrUR)"/>
+        <text x="160" y="120" fill="#ffb86b" class="svg-label">h₁</text>
+        <text x="300" y="120" fill="#ffb86b" class="svg-label">h₂</text>
+        <text x="440" y="120" fill="#ffb86b" class="svg-label">h₃</text>
+        <text x="580" y="120" fill="#ffb86b" class="svg-label">h₄</text>
+
+        <!-- entradas -->
+        <text x="90"  y="200" text-anchor="middle" class="svg-text">"O"</text>
+        <text x="230" y="200" text-anchor="middle" class="svg-text">"gato"</text>
+        <text x="370" y="200" text-anchor="middle" class="svg-text">"está"</text>
+        <text x="510" y="200" text-anchor="middle" class="svg-text">"muito"</text>
+        <text x="650" y="200" text-anchor="middle" class="svg-text">"feliz"</text>
+        <path d="M90  185 L90  165" stroke="#4fd1c5" stroke-width="1.5" marker-end="url(#arrUR2)"/>
+        <path d="M230 185 L230 165" stroke="#4fd1c5" stroke-width="1.5" marker-end="url(#arrUR2)"/>
+        <path d="M370 185 L370 165" stroke="#4fd1c5" stroke-width="1.5" marker-end="url(#arrUR2)"/>
+        <path d="M510 185 L510 165" stroke="#4fd1c5" stroke-width="1.5" marker-end="url(#arrUR2)"/>
+        <path d="M650 185 L650 165" stroke="#4fd1c5" stroke-width="1.5" marker-end="url(#arrUR2)"/>
+
+        <!-- saídas -->
+        <text x="90"  y="80" text-anchor="middle" class="svg-text">y₁</text>
+        <text x="230" y="80" text-anchor="middle" class="svg-text">y₂</text>
+        <text x="370" y="80" text-anchor="middle" class="svg-text">y₃</text>
+        <text x="510" y="80" text-anchor="middle" class="svg-text">y₄</text>
+        <text x="650" y="80" text-anchor="middle" class="svg-text">y₅</text>
+        <path d="M90  100 L90  90"  stroke="#4fd1c5" stroke-width="1.5" marker-end="url(#arrUR2)"/>
+        <path d="M230 100 L230 90"  stroke="#4fd1c5" stroke-width="1.5" marker-end="url(#arrUR2)"/>
+        <path d="M370 100 L370 90"  stroke="#4fd1c5" stroke-width="1.5" marker-end="url(#arrUR2)"/>
+        <path d="M510 100 L510 90"  stroke="#4fd1c5" stroke-width="1.5" marker-end="url(#arrUR2)"/>
+        <path d="M650 100 L650 90"  stroke="#4fd1c5" stroke-width="1.5" marker-end="url(#arrUR2)"/>
+
+        <!-- inicial h0 -->
+        <text x="20" y="135" fill="#ffb86b" class="svg-label">h₀</text>
+        <path d="M30 130 L40 130" stroke="#ffb86b" stroke-width="2" marker-end="url(#arrUR)"/>
+
+        <defs>
+          <marker id="arrUR"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#ffb86b"/></marker>
+          <marker id="arrUR2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#4fd1c5"/></marker>
+        </defs>
+      </svg>
+      <div class="caption">A mesma célula RNN aplicada a uma sequência de 5 palavras. O estado h carrega o contexto de uma palavra para a próxima.</div>
+    </div>
+  </section>
+
+  <!-- ============ BPTT ============ -->
+  <section class="block" id="bptt">
+    <h2><span class="num">5</span> Treinamento com BPTT</h2>
+
+    <p>
+      Como treinar uma RNN? Você desenrola a sequência inteira e aplica
+      backpropagation normal — só que através de muitas cópias da mesma célula.
+      Essa variante é chamada <strong>Backpropagation Through Time (BPTT)</strong>.
+    </p>
+
+    <p>
+      Para cada passo de tempo <em>t</em>, há um gradiente do erro com respeito
+      ao estado hₜ. Esse gradiente precisa ser <strong>somado</strong> em todos
+      os passos para atualizar corretamente os pesos compartilhados.
+    </p>
+
+    <div class="formula">
+      <div class="fname">Gradiente acumulado no tempo</div>
+      ∂L/∂W = Σₜ ∂Lₜ/∂W
+    </div>
+
+    <h3>Truncated BPTT</h3>
+    <p>
+      Para sequências muito longas (milhares de tokens), desenrolar tudo gasta
+      memória demais. A solução prática é <strong>BPTT truncado</strong>:
+      desenrole apenas K passos (típico: K=20 a 100), compute o gradiente e
+      atualize. Isso quebra a memória teórica de longo prazo, mas é necessário
+      computacionalmente.
+    </p>
+  </section>
+
+  <!-- ============ VANISHING ============ -->
+  <section class="block" id="vanishing">
+    <h2><span class="num">6</span> O problema dos gradientes que somem</h2>
+
+    <p>
+      Em 1991, <strong>Sepp Hochreiter</strong> (na época, aluno de Schmidhuber)
+      analisou matematicamente o que acontecia ao treinar uma RNN em sequências
+      longas. Sua descoberta: <em>os gradientes diminuem (ou aumentam) exponencialmente
+      ao retropropagarem no tempo</em>.
+    </p>
+
+    <p>
+      A razão é simples: ao calcular ∂hₜ/∂hₜ₋ₖ, multiplicamos a matriz Wₕₕ k vezes,
+      ponderada pela derivada do tanh. Se os autovalores de Wₕₕ são menores que 1,
+      o gradiente <strong>some</strong>. Se são maiores, ele <strong>explode</strong>.
+    </p>
+
+    <div class="formula">
+      ∂hₜ/∂hₜ₋ₖ ≈ Wₕₕᵏ · (produtos de tanh')
+    </div>
+
+    <div class="analogy">
+      <span class="tag">Analogia · telefone sem fio</span>
+      <p>
+        Lembra do jogo "telefone sem fio"? Você sussurra uma mensagem que vai
+        passando de pessoa em pessoa. Quanto mais gente no meio, mais distorcida
+        chega no final — porque cada um introduz pequenas distorções que vão
+        acumulando. O gradiente da RNN sofre o mesmo destino: a cada passo
+        retropropagado, perde um pouco da informação original.
+      </p>
+    </div>
+
+    <h3>Soluções práticas (antes da LSTM)</h3>
+    <ul>
+      <li><strong>Gradient clipping</strong> — corta gradientes que excedam um limite, evitando explosões.</li>
+      <li><strong>Boa inicialização</strong> — Wₕₕ como matriz identidade ortogonal (Saxe et al., 2014).</li>
+      <li><strong>ReLU em vez de tanh</strong> — IRNN (Le et al., 2015) usa ReLU e identidade inicial para sequências longas.</li>
+    </ul>
+
+    <h3>A solução definitiva: LSTM</h3>
+    <p>
+      Em 1997, Hochreiter e Schmidhuber publicaram a LSTM, que resolve o problema
+      adicionando uma "esteira de memória" e portões que controlam o fluxo. Veja
+      em <a href="lstm.html">LSTM / GRU</a>.
+    </p>
+  </section>
+
+  <!-- ============ TOPOLOGIAS ============ -->
+  <section class="block" id="topologias">
+    <h2><span class="num">7</span> Topologias: many-to-one, one-to-many, etc.</h2>
+
+    <p>
+      Dependendo do problema, ajustamos como a RNN consome entradas e produz
+      saídas. Andrej Karpathy popularizou estas cinco topologias num post famoso
+      de 2015:
+    </p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg">
+        <!-- One-to-one -->
+        <g transform="translate(10,30)">
+          <text x="50" y="0" text-anchor="middle" fill="#7aa2ff" font-weight="700">one-to-one</text>
+          <rect x="35" y="60" width="30" height="40" fill="#b07aff" opacity="0.85"/>
+          <rect x="35" y="20" width="30" height="20" fill="#4fd1c5" opacity="0.85"/>
+          <rect x="35" y="120" width="30" height="20" fill="#7aa2ff" opacity="0.85"/>
+          <text x="50" y="170" text-anchor="middle" class="svg-label">MLP/CNN clássico</text>
+        </g>
+        <!-- One-to-many -->
+        <g transform="translate(160,30)">
+          <text x="80" y="0" text-anchor="middle" fill="#7aa2ff" font-weight="700">one-to-many</text>
+          <rect x="65" y="120" width="30" height="20" fill="#7aa2ff" opacity="0.85"/>
+          <rect x="20" y="60" width="30" height="40" fill="#b07aff" opacity="0.85"/>
+          <rect x="65" y="60" width="30" height="40" fill="#b07aff" opacity="0.85"/>
+          <rect x="110" y="60" width="30" height="40" fill="#b07aff" opacity="0.85"/>
+          <rect x="20" y="20" width="30" height="20" fill="#4fd1c5" opacity="0.85"/>
+          <rect x="65" y="20" width="30" height="20" fill="#4fd1c5" opacity="0.85"/>
+          <rect x="110" y="20" width="30" height="20" fill="#4fd1c5" opacity="0.85"/>
+          <line x1="50" y1="80" x2="65" y2="80" stroke="#ffb86b" stroke-width="1.5"/>
+          <line x1="95" y1="80" x2="110" y2="80" stroke="#ffb86b" stroke-width="1.5"/>
+          <text x="80" y="170" text-anchor="middle" class="svg-label">image captioning</text>
+        </g>
+        <!-- Many-to-one -->
+        <g transform="translate(320,30)">
+          <text x="80" y="0" text-anchor="middle" fill="#7aa2ff" font-weight="700">many-to-one</text>
+          <rect x="110" y="20" width="30" height="20" fill="#4fd1c5" opacity="0.85"/>
+          <rect x="20" y="60" width="30" height="40" fill="#b07aff" opacity="0.85"/>
+          <rect x="65" y="60" width="30" height="40" fill="#b07aff" opacity="0.85"/>
+          <rect x="110" y="60" width="30" height="40" fill="#b07aff" opacity="0.85"/>
+          <rect x="20" y="120" width="30" height="20" fill="#7aa2ff" opacity="0.85"/>
+          <rect x="65" y="120" width="30" height="20" fill="#7aa2ff" opacity="0.85"/>
+          <rect x="110" y="120" width="30" height="20" fill="#7aa2ff" opacity="0.85"/>
+          <line x1="50" y1="80" x2="65" y2="80" stroke="#ffb86b" stroke-width="1.5"/>
+          <line x1="95" y1="80" x2="110" y2="80" stroke="#ffb86b" stroke-width="1.5"/>
+          <text x="80" y="170" text-anchor="middle" class="svg-label">sentiment, intenção</text>
+        </g>
+        <!-- Many-to-many sync -->
+        <g transform="translate(480,30)">
+          <text x="80" y="0" text-anchor="middle" fill="#7aa2ff" font-weight="700">many-to-many</text>
+          <rect x="20" y="20" width="30" height="20" fill="#4fd1c5" opacity="0.85"/>
+          <rect x="65" y="20" width="30" height="20" fill="#4fd1c5" opacity="0.85"/>
+          <rect x="110" y="20" width="30" height="20" fill="#4fd1c5" opacity="0.85"/>
+          <rect x="20" y="60" width="30" height="40" fill="#b07aff" opacity="0.85"/>
+          <rect x="65" y="60" width="30" height="40" fill="#b07aff" opacity="0.85"/>
+          <rect x="110" y="60" width="30" height="40" fill="#b07aff" opacity="0.85"/>
+          <rect x="20" y="120" width="30" height="20" fill="#7aa2ff" opacity="0.85"/>
+          <rect x="65" y="120" width="30" height="20" fill="#7aa2ff" opacity="0.85"/>
+          <rect x="110" y="120" width="30" height="20" fill="#7aa2ff" opacity="0.85"/>
+          <line x1="50" y1="80" x2="65" y2="80" stroke="#ffb86b" stroke-width="1.5"/>
+          <line x1="95" y1="80" x2="110" y2="80" stroke="#ffb86b" stroke-width="1.5"/>
+          <text x="80" y="170" text-anchor="middle" class="svg-label">POS tagging</text>
+        </g>
+        <!-- Many-to-many seq2seq -->
+        <g transform="translate(640,30)">
+          <text x="60" y="0" text-anchor="middle" fill="#7aa2ff" font-weight="700">seq2seq</text>
+          <rect x="0"  y="60" width="25" height="40" fill="#b07aff" opacity="0.85"/>
+          <rect x="30" y="60" width="25" height="40" fill="#b07aff" opacity="0.85"/>
+          <rect x="60" y="60" width="25" height="40" fill="#b07aff" opacity="0.85"/>
+          <rect x="90" y="60" width="25" height="40" fill="#ffb86b" opacity="0.85"/>
+          <rect x="120" y="60" width="25" height="40" fill="#ffb86b" opacity="0.85"/>
+          <rect x="0"  y="120" width="25" height="20" fill="#7aa2ff" opacity="0.85"/>
+          <rect x="30" y="120" width="25" height="20" fill="#7aa2ff" opacity="0.85"/>
+          <rect x="60" y="120" width="25" height="20" fill="#7aa2ff" opacity="0.85"/>
+          <rect x="90"  y="20" width="25" height="20" fill="#4fd1c5" opacity="0.85"/>
+          <rect x="120" y="20" width="25" height="20" fill="#4fd1c5" opacity="0.85"/>
+          <text x="60" y="170" text-anchor="middle" class="svg-label">tradução</text>
+        </g>
+      </svg>
+      <div class="caption">As cinco topologias de Karpathy. Cor azul = entrada, roxa = RNN, verde = saída.</div>
+    </div>
+
+    <ul>
+      <li><strong>one-to-one</strong>: nem é RNN — MLP normal.</li>
+      <li><strong>one-to-many</strong>: uma entrada gera uma sequência (image captioning).</li>
+      <li><strong>many-to-one</strong>: uma sequência → uma saída (análise de sentimento).</li>
+      <li><strong>many-to-many síncrono</strong>: cada entrada gera uma saída (POS tagging).</li>
+      <li><strong>many-to-many seq2seq</strong>: lê toda a entrada e depois gera a saída (tradução).</li>
+    </ul>
+  </section>
+
+  <!-- ============ BIDIRECIONAL ============ -->
+  <section class="block" id="bidirecional">
+    <h2><span class="num">8</span> RNNs bidirecionais</h2>
+
+    <p>
+      Em muitas tarefas, é útil olhar não só o que veio antes mas também o que
+      virá depois. Em "Ele <em>banco</em>...", precisamos do contexto à direita
+      para saber se "banco" é assento ou instituição financeira.
+    </p>
+
+    <p>
+      A solução é a <strong>RNN bidirecional</strong> (BRNN): roda duas RNNs,
+      uma da esquerda para a direita e outra da direita para a esquerda, e
+      concatena os estados ocultos. Proposta por Schuster e Paliwal em 1997.
+    </p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 600 240" xmlns="http://www.w3.org/2000/svg">
+        <!-- Forward -->
+        <rect x="40"  y="60" width="80" height="40" rx="6" fill="#b07aff" opacity="0.85"/>
+        <rect x="160" y="60" width="80" height="40" rx="6" fill="#b07aff" opacity="0.85"/>
+        <rect x="280" y="60" width="80" height="40" rx="6" fill="#b07aff" opacity="0.85"/>
+        <rect x="400" y="60" width="80" height="40" rx="6" fill="#b07aff" opacity="0.85"/>
+        <text x="80"  y="85" text-anchor="middle" fill="#fff" font-size="12">RNN→</text>
+        <text x="200" y="85" text-anchor="middle" fill="#fff" font-size="12">RNN→</text>
+        <text x="320" y="85" text-anchor="middle" fill="#fff" font-size="12">RNN→</text>
+        <text x="440" y="85" text-anchor="middle" fill="#fff" font-size="12">RNN→</text>
+        <path d="M120 80 L160 80" stroke="#ffb86b" stroke-width="2" marker-end="url(#arrBF)"/>
+        <path d="M240 80 L280 80" stroke="#ffb86b" stroke-width="2" marker-end="url(#arrBF)"/>
+        <path d="M360 80 L400 80" stroke="#ffb86b" stroke-width="2" marker-end="url(#arrBF)"/>
+
+        <!-- Backward -->
+        <rect x="40"  y="140" width="80" height="40" rx="6" fill="#4fd1c5" opacity="0.85"/>
+        <rect x="160" y="140" width="80" height="40" rx="6" fill="#4fd1c5" opacity="0.85"/>
+        <rect x="280" y="140" width="80" height="40" rx="6" fill="#4fd1c5" opacity="0.85"/>
+        <rect x="400" y="140" width="80" height="40" rx="6" fill="#4fd1c5" opacity="0.85"/>
+        <text x="80"  y="165" text-anchor="middle" fill="#0b1020" font-size="12">←RNN</text>
+        <text x="200" y="165" text-anchor="middle" fill="#0b1020" font-size="12">←RNN</text>
+        <text x="320" y="165" text-anchor="middle" fill="#0b1020" font-size="12">←RNN</text>
+        <text x="440" y="165" text-anchor="middle" fill="#0b1020" font-size="12">←RNN</text>
+        <path d="M400 160 L360 160" stroke="#ffb86b" stroke-width="2" marker-end="url(#arrBF)"/>
+        <path d="M280 160 L240 160" stroke="#ffb86b" stroke-width="2" marker-end="url(#arrBF)"/>
+        <path d="M160 160 L120 160" stroke="#ffb86b" stroke-width="2" marker-end="url(#arrBF)"/>
+
+        <!-- saídas concatenadas -->
+        <text x="80"  y="30" text-anchor="middle" class="svg-text">y₁</text>
+        <text x="200" y="30" text-anchor="middle" class="svg-text">y₂</text>
+        <text x="320" y="30" text-anchor="middle" class="svg-text">y₃</text>
+        <text x="440" y="30" text-anchor="middle" class="svg-text">y₄</text>
+
+        <!-- entradas -->
+        <text x="80"  y="220" text-anchor="middle" class="svg-text">x₁</text>
+        <text x="200" y="220" text-anchor="middle" class="svg-text">x₂</text>
+        <text x="320" y="220" text-anchor="middle" class="svg-text">x₃</text>
+        <text x="440" y="220" text-anchor="middle" class="svg-text">x₄</text>
+
+        <defs>
+          <marker id="arrBF" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#ffb86b"/></marker>
+        </defs>
+      </svg>
+      <div class="caption">RNN bidirecional: duas RNNs (uma em cada direção) e seus estados concatenados.</div>
+    </div>
+  </section>
+
+  <!-- ============ EXEMPLO ============ -->
+  <section class="block" id="exemplo">
+    <h2><span class="num">9</span> Exemplo: gerando texto caractere a caractere</h2>
+
+    <p>
+      Um demo clássico de Karpathy (2015): treinar uma RNN para prever o próximo
+      caractere em um corpus (Shakespeare, código Linux, livros de cálculo,
+      etc.). Depois de treinar, amostre caractere a caractere para gerar texto
+      novo no estilo do corpus.
+    </p>
+
+    <h3>O algoritmo</h3>
+    <ol>
+      <li>Dividir o texto em sequências de N caracteres.</li>
+      <li>Para cada sequência, a entrada é "abc...x" e o alvo é "bcd...y" (deslocado uma posição).</li>
+      <li>Treinar a RNN com cross-entropy para prever cada caractere.</li>
+      <li>Para gerar: dar um caractere inicial, amostrar o próximo da saída, alimentar de volta, repetir.</li>
+    </ol>
+
+<pre class="code"><span class="kw">import</span> torch
+<span class="kw">import</span> torch.nn <span class="kw">as</span> nn
+
+<span class="kw">class</span> <span class="fn">CharRNN</span>(nn.Module):
+    <span class="kw">def</span> __init__(self, vocab_size, hidden=128):
+        super().__init__()
+        self.embed = nn.Embedding(vocab_size, hidden)
+        self.rnn   = nn.RNN(hidden, hidden, batch_first=<span class="kw">True</span>)
+        self.out   = nn.Linear(hidden, vocab_size)
+
+    <span class="kw">def</span> <span class="fn">forward</span>(self, x, h=<span class="kw">None</span>):
+        e = self.embed(x)
+        out, h = self.rnn(e, h)
+        return self.out(out), h
+
+<span class="com"># Treino: cross-entropy entre out e target deslocado em 1</span>
+</pre>
+
+    <p>
+      Karpathy mostrou que essa rede minúscula é capaz de gerar texto que
+      <em>parece</em> Shakespeare (com pontuação, nomes de personagens, e até
+      blank verse rítmico), código C compilável de cera, e até latex matemático
+      verossímil — tudo sem nunca ter sido ensinado explicitamente as regras
+      dessas linguagens.
+    </p>
+  </section>
+
+  <!-- ============ APLICAÇÕES ============ -->
+  <section class="block" id="aplicacoes">
+    <h2><span class="num">10</span> Aplicações clássicas</h2>
+
+    <ul>
+      <li><strong>Reconhecimento de fala</strong> — DNNs + HMM, depois RNNs end-to-end (Graves et al.).</li>
+      <li><strong>Tradução automática</strong> — encoder-decoder com LSTM (antes dos Transformers).</li>
+      <li><strong>Modelagem de linguagem</strong> — RNN-LM e LSTM-LM dominaram até 2017.</li>
+      <li><strong>Geração de música</strong> — Magenta do Google usou RNNs.</li>
+      <li><strong>Modelagem financeira</strong> — séries temporais de ações, FX, opções.</li>
+      <li><strong>Detecção de anomalias</strong> em telemetria de sensores.</li>
+      <li><strong>Reconhecimento de escrita à mão</strong> (online): tabuleta digital, Apple Pencil.</li>
+    </ul>
+  </section>
+
+  <!-- ============ SUCESSORAS ============ -->
+  <section class="block" id="sucessoras">
+    <h2><span class="num">11</span> Sucessoras: LSTM, GRU, Transformer</h2>
+
+    <p>
+      As RNNs simples (vanilla / Elman) foram quase totalmente substituídas em
+      produção por suas sucessoras:
+    </p>
+    <ul>
+      <li><a href="lstm.html"><strong>LSTM (1997)</strong></a> — adiciona portões e uma "esteira" de memória. Resolve o vanishing gradient.</li>
+      <li><strong>GRU (2014)</strong> — versão simplificada da LSTM com menos portões e parâmetros.</li>
+      <li><a href="transformer.html"><strong>Transformer (2017)</strong></a> — elimina a recorrência completamente em favor da atenção.</li>
+      <li><strong>State Space Models (Mamba, 2023)</strong> — uma volta às raízes recorrentes, mas com eficiência moderna.</li>
+    </ul>
+
+    <p>
+      Hoje, RNNs simples são raramente usadas, mas suas <em>ideias</em> permeiam
+      tudo. A noção de "estado interno", "compartilhamento de pesos no tempo" e
+      "processar sequências passo a passo" continua presente nas arquiteturas
+      mais avançadas.
+    </p>
+  </section>
+
+  <!-- ============ IMPL ============ -->
+  <section class="block" id="impl">
+    <h2><span class="num">12</span> Implementações</h2>
+
+    <div class="impl">
+      <div class="iname">PyTorch — <code>nn.RNN</code>, <code>nn.LSTM</code>, <code>nn.GRU</code></div>
+      <div class="idesc">Suporte nativo com kernels otimizados em CUDA. Modos batch-first e bidirecional.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">TensorFlow / Keras — <code>SimpleRNN</code>, <code>LSTM</code>, <code>GRU</code></div>
+      <div class="idesc">API com <code>return_sequences</code> e <code>return_state</code> para flexibilidade.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">cuDNN</div>
+      <div class="idesc">Biblioteca da NVIDIA com implementações ultra-rápidas das células recorrentes mais comuns.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">char-rnn (Karpathy, 2015)</div>
+      <div class="idesc">O repositório do GitHub que popularizou demos de geração de texto. Ainda excelente para aprender.</div>
+    </div>
+  </section>
+
+  <!-- ============ ARTIGOS ============ -->
+  <section class="block" id="artigos">
+    <h2><span class="num">13</span> Artigos seminais</h2>
+
+    <div class="papers">
+      <div class="paper">
+        <span class="pyear">1982</span><span class="ptitle">Neural networks and physical systems with emergent collective computational abilities</span><br>
+        <span class="pauthors">John Hopfield — PNAS</span>
+        <div class="psumm">A rede de Hopfield: primeira rede recorrente importante. Memória associativa para padrões.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">1986</span><span class="ptitle">Serial Order: A Parallel Distributed Processing Approach</span><br>
+        <span class="pauthors">Michael Jordan — Technical Report</span>
+        <div class="psumm">Introduz a "Jordan network", precursora das RNNs modernas.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">1990</span><span class="ptitle">Finding Structure in Time</span><br>
+        <span class="pauthors">Jeffrey Elman — Cognitive Science</span>
+        <div class="psumm">A "Elman network" — a forma canônica de RNN que ensinamos hoje.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">1991</span><span class="ptitle">Untersuchungen zu dynamischen neuronalen Netzen</span><br>
+        <span class="pauthors">Sepp Hochreiter — tese de mestrado, TU München</span>
+        <div class="psumm">Identifica formalmente o problema de vanishing gradients em RNNs.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">1994</span><span class="ptitle">Learning Long-Term Dependencies with Gradient Descent is Difficult</span><br>
+        <span class="pauthors">Yoshua Bengio, Patrice Simard, Paolo Frasconi — IEEE Trans. NN</span>
+        <div class="psumm">Análise teórica do problema de dependências de longo prazo.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">1997</span><span class="ptitle">Bidirectional Recurrent Neural Networks</span><br>
+        <span class="pauthors">Mike Schuster, Kuldip Paliwal — IEEE Trans. Signal Processing</span>
+        <div class="psumm">Introduz a BRNN.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2013</span><span class="ptitle">On the difficulty of training Recurrent Neural Networks</span><br>
+        <span class="pauthors">Razvan Pascanu, Tomas Mikolov, Yoshua Bengio — ICML</span>
+        <div class="psumm">Análise detalhada de exploding e vanishing gradients; propõe gradient clipping.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2013</span><span class="ptitle">Speech Recognition with Deep Recurrent Neural Networks</span><br>
+        <span class="pauthors">Alex Graves, Abdel-rahman Mohamed, Geoffrey Hinton — ICASSP</span>
+        <div class="psumm">RNNs profundas batem o estado da arte em reconhecimento de fala.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2015</span><span class="ptitle">The Unreasonable Effectiveness of Recurrent Neural Networks</span><br>
+        <span class="pauthors">Andrej Karpathy — blog post</span>
+        <div class="psumm">Post viral que popularizou as char-RNNs e os tipos de topologia de sequência.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ APROFUNDAR ============ -->
+  <section class="block" id="aprofundar">
+    <h2><span class="num">14</span> Para se aprofundar</h2>
+
+    <ul>
+      <li><strong>Karpathy — char-rnn post (2015)</strong>: leitura obrigatória.</li>
+      <li><strong>Colah — Understanding LSTMs (2015)</strong>: visualizações lindas.</li>
+      <li><strong>Goodfellow et al. — Deep Learning, cap. 10</strong>: tratamento formal.</li>
+      <li><strong>CS224n (Stanford)</strong>: NLP com RNNs e atenção.</li>
+    </ul>
+  </section>
+
+  <a href="lstm.html" class="deeplink">
+    <span class="arrow">→</span>
+    <span class="dt">Próxima arquitetura</span>
+    <span class="dn">LSTM e GRU — Memória de Longo Prazo</span>
+  </a>
+
+  <footer>
+    <p>Página detalhada · RNN · Parte do projeto <a href="index.html">Histórico de Evolução dos Modelos de IA</a></p>
+  </footer>
+</div>
+</body>
+</html>

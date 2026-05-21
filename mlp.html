@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MLP + Backpropagation — Página Detalhada</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <nav class="topnav">
+    <a href="index.html">← Voltar ao índice</a>
+    <span class="crumbs">Arquitetura · 1986</span>
+  </nav>
+
+  <header class="hero">
+    <div class="eyebrow">O renascimento das redes neurais · 1986</div>
+    <h1>MLP + Backpropagation</h1>
+    <p class="lead">
+      A descoberta que tirou as redes neurais de duas décadas de hibernação.
+      Empilhando perceptrons em camadas e treinando-os com um algoritmo elegante
+      baseado em cálculo, nasceram as primeiras redes capazes de aprender qualquer
+      coisa — em teoria, qualquer função contínua.
+    </p>
+  </header>
+
+  <div class="toc">
+    <h4>Sumário</h4>
+    <ol>
+      <li><a href="#contexto">Contexto: por que precisávamos de mais camadas</a></li>
+      <li><a href="#arquitetura">A arquitetura MLP</a></li>
+      <li><a href="#nao-linearidade">A não-linearidade salva o dia</a></li>
+      <li><a href="#forward">Forward pass passo a passo</a></li>
+      <li><a href="#perda">Funções de perda</a></li>
+      <li><a href="#backprop">Backpropagation explicado</a></li>
+      <li><a href="#gradiente">Gradient descent e otimizadores</a></li>
+      <li><a href="#ativacoes">Funções de ativação</a></li>
+      <li><a href="#teorema">O teorema da aproximação universal</a></li>
+      <li><a href="#problemas">Problemas práticos do treino</a></li>
+      <li><a href="#exemplo">Exemplo prático: XOR resolvido</a></li>
+      <li><a href="#impl">Implementações</a></li>
+      <li><a href="#artigos">Artigos seminais</a></li>
+      <li><a href="#aprofundar">Para se aprofundar</a></li>
+    </ol>
+  </div>
+
+  <!-- ============ CONTEXTO ============ -->
+  <section class="block" id="contexto">
+    <h2><span class="num">1</span> Contexto: por que precisávamos de mais camadas</h2>
+
+    <p>
+      Em 1969, Minsky e Papert haviam mostrado que um perceptron simples não
+      consegue aprender o XOR. A solução teórica era clara desde os anos 60:
+      <strong>empilhe camadas</strong>. Uma rede com uma camada oculta pode
+      desenhar fronteiras de decisão arbitrariamente complexas.
+    </p>
+    <p>
+      Mas havia um problema prático brutal: <em>como ajustar os pesos das
+      camadas internas?</em> Para os pesos da última camada, era simples — você
+      compara a saída com a verdade e ajusta. Para os pesos das camadas anteriores,
+      não havia uma "verdade" direta a comparar.
+    </p>
+    <p>
+      A solução veio em 1986 com o artigo "Learning representations by
+      back-propagating errors" de <strong>David Rumelhart</strong>,
+      <strong>Geoffrey Hinton</strong> e <strong>Ronald Williams</strong> na revista
+      <em>Nature</em>. Eles popularizaram o algoritmo de <em>backpropagation</em>
+      (que vinha sendo redescoberto desde os anos 60, por Werbos em 1974, Linnainmaa
+      em 1970 e até por Kelley em 1960). O ressurgimento foi imediato.
+    </p>
+
+    <div class="callout">
+      <span class="tag">Crédito justo</span>
+      <p>
+        O backpropagation não foi inventado em 1986. <strong>Paul Werbos</strong>
+        descreveu o algoritmo em sua tese de doutorado em 1974, e
+        <strong>Seppo Linnainmaa</strong> apresentou a versão para diferenciação
+        automática reversa em 1970. Rumelhart-Hinton-Williams tiveram o mérito de
+        aplicar com sucesso a problemas práticos de aprendizado e popularizar o método.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ ARQUITETURA ============ -->
+  <section class="block" id="arquitetura">
+    <h2><span class="num">2</span> A arquitetura MLP</h2>
+
+    <p>
+      MLP significa <strong>Multi-Layer Perceptron</strong>. É uma rede feita de
+      múltiplas camadas de neurônios, organizadas em três tipos:
+    </p>
+
+    <div class="cards">
+      <div class="card"><div class="ck">Entrada</div><div class="cv">Vetor com as features do exemplo</div></div>
+      <div class="card"><div class="ck">Ocultas</div><div class="cv">Uma ou mais camadas intermediárias (a "profundidade")</div></div>
+      <div class="card"><div class="ck">Saída</div><div class="cv">Probabilidades / valores previstos</div></div>
+    </div>
+
+    <p>
+      Cada neurônio de uma camada está conectado a <em>todos</em> os neurônios da
+      camada seguinte — por isso essas camadas são chamadas de
+      <strong>"fully connected"</strong> ou <strong>"dense"</strong>.
+    </p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 720 380" xmlns="http://www.w3.org/2000/svg">
+        <!-- camadas -->
+        <g>
+          <!-- input -->
+          <circle cx="80"  cy="80"  r="20" fill="#1f2952" stroke="#7aa2ff" stroke-width="2"/>
+          <circle cx="80"  cy="160" r="20" fill="#1f2952" stroke="#7aa2ff" stroke-width="2"/>
+          <circle cx="80"  cy="240" r="20" fill="#1f2952" stroke="#7aa2ff" stroke-width="2"/>
+          <circle cx="80"  cy="320" r="20" fill="#1f2952" stroke="#7aa2ff" stroke-width="2"/>
+          <text x="80" y="360" text-anchor="middle" class="svg-label">entrada (4)</text>
+        </g>
+        <g>
+          <circle cx="260" cy="50"  r="18" fill="#b07aff" opacity="0.85"/>
+          <circle cx="260" cy="115" r="18" fill="#b07aff" opacity="0.85"/>
+          <circle cx="260" cy="180" r="18" fill="#b07aff" opacity="0.85"/>
+          <circle cx="260" cy="245" r="18" fill="#b07aff" opacity="0.85"/>
+          <circle cx="260" cy="310" r="18" fill="#b07aff" opacity="0.85"/>
+          <text x="260" y="350" text-anchor="middle" class="svg-label">oculta 1 (5)</text>
+        </g>
+        <g>
+          <circle cx="440" cy="80"  r="18" fill="#b07aff" opacity="0.85"/>
+          <circle cx="440" cy="145" r="18" fill="#b07aff" opacity="0.85"/>
+          <circle cx="440" cy="210" r="18" fill="#b07aff" opacity="0.85"/>
+          <circle cx="440" cy="275" r="18" fill="#b07aff" opacity="0.85"/>
+          <text x="440" y="350" text-anchor="middle" class="svg-label">oculta 2 (4)</text>
+        </g>
+        <g>
+          <circle cx="620" cy="140" r="20" fill="#4fd1c5" opacity="0.9"/>
+          <circle cx="620" cy="220" r="20" fill="#4fd1c5" opacity="0.9"/>
+          <text x="620" y="270" text-anchor="middle" class="svg-label">saída (2)</text>
+        </g>
+
+        <!-- conexões densas -->
+        <g stroke="#4fd1c5" stroke-width="0.5" opacity="0.35">
+          <line x1="100" y1="80"  x2="242" y2="50"/><line x1="100" y1="80"  x2="242" y2="115"/><line x1="100" y1="80"  x2="242" y2="180"/><line x1="100" y1="80"  x2="242" y2="245"/><line x1="100" y1="80"  x2="242" y2="310"/>
+          <line x1="100" y1="160" x2="242" y2="50"/><line x1="100" y1="160" x2="242" y2="115"/><line x1="100" y1="160" x2="242" y2="180"/><line x1="100" y1="160" x2="242" y2="245"/><line x1="100" y1="160" x2="242" y2="310"/>
+          <line x1="100" y1="240" x2="242" y2="50"/><line x1="100" y1="240" x2="242" y2="115"/><line x1="100" y1="240" x2="242" y2="180"/><line x1="100" y1="240" x2="242" y2="245"/><line x1="100" y1="240" x2="242" y2="310"/>
+          <line x1="100" y1="320" x2="242" y2="50"/><line x1="100" y1="320" x2="242" y2="115"/><line x1="100" y1="320" x2="242" y2="180"/><line x1="100" y1="320" x2="242" y2="245"/><line x1="100" y1="320" x2="242" y2="310"/>
+          <line x1="278" y1="50"  x2="422" y2="80"/><line x1="278" y1="50"  x2="422" y2="145"/><line x1="278" y1="50"  x2="422" y2="210"/><line x1="278" y1="50"  x2="422" y2="275"/>
+          <line x1="278" y1="115" x2="422" y2="80"/><line x1="278" y1="115" x2="422" y2="145"/><line x1="278" y1="115" x2="422" y2="210"/><line x1="278" y1="115" x2="422" y2="275"/>
+          <line x1="278" y1="180" x2="422" y2="80"/><line x1="278" y1="180" x2="422" y2="145"/><line x1="278" y1="180" x2="422" y2="210"/><line x1="278" y1="180" x2="422" y2="275"/>
+          <line x1="278" y1="245" x2="422" y2="80"/><line x1="278" y1="245" x2="422" y2="145"/><line x1="278" y1="245" x2="422" y2="210"/><line x1="278" y1="245" x2="422" y2="275"/>
+          <line x1="278" y1="310" x2="422" y2="80"/><line x1="278" y1="310" x2="422" y2="145"/><line x1="278" y1="310" x2="422" y2="210"/><line x1="278" y1="310" x2="422" y2="275"/>
+          <line x1="458" y1="80"  x2="602" y2="140"/><line x1="458" y1="80"  x2="602" y2="220"/>
+          <line x1="458" y1="145" x2="602" y2="140"/><line x1="458" y1="145" x2="602" y2="220"/>
+          <line x1="458" y1="210" x2="602" y2="140"/><line x1="458" y1="210" x2="602" y2="220"/>
+          <line x1="458" y1="275" x2="602" y2="140"/><line x1="458" y1="275" x2="602" y2="220"/>
+        </g>
+
+        <!-- setas direção -->
+        <path d="M150 25 L600 25" stroke="#4fd1c5" stroke-width="2" fill="none" marker-end="url(#arrF)"/>
+        <text x="370" y="18" text-anchor="middle" fill="#4fd1c5" font-weight="700">forward</text>
+
+        <path d="M600 360 L150 360" stroke="#ff7a90" stroke-width="2" stroke-dasharray="5 3" fill="none" marker-end="url(#arrB)"/>
+        <text x="370" y="378" text-anchor="middle" fill="#ff7a90" font-weight="700">backward (erros)</text>
+
+        <defs>
+          <marker id="arrF" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#4fd1c5"/></marker>
+          <marker id="arrB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#ff7a90"/></marker>
+        </defs>
+      </svg>
+      <div class="caption">MLP típica: 4 entradas → 5 neurônios → 4 neurônios → 2 saídas. Sinal flui para frente; erro, para trás.</div>
+    </div>
+
+    <h3>Notação matemática</h3>
+    <p>
+      Vamos chamar de <strong>a⁽ˡ⁾</strong> as ativações (saídas) da camada <em>l</em>,
+      <strong>W⁽ˡ⁾</strong> a matriz de pesos da camada <em>l</em>, e <strong>b⁽ˡ⁾</strong>
+      o vetor de bias. A computação de uma camada densa é:
+    </p>
+
+    <div class="formula">
+      <div class="fname">Camada densa</div>
+      z⁽ˡ⁾ = W⁽ˡ⁾ · a⁽ˡ⁻¹⁾ + b⁽ˡ⁾<br>
+      a⁽ˡ⁾ = σ(z⁽ˡ⁾)
+    </div>
+
+    <p>
+      Onde σ é a função de ativação não-linear. Essa fórmula se repete para cada
+      camada da rede.
+    </p>
+  </section>
+
+  <!-- ============ NÃO-LINEARIDADE ============ -->
+  <section class="block" id="nao-linearidade">
+    <h2><span class="num">3</span> A não-linearidade salva o dia</h2>
+
+    <p>
+      Por que precisamos de funções de ativação não-lineares como sigmoid, tanh ou
+      ReLU? Por uma razão matemática elegante: <strong>uma composição de funções
+      lineares é uma função linear</strong>.
+    </p>
+
+    <p>
+      Se cada camada fosse só "z = W·a + b" (sem σ), então:
+    </p>
+
+    <div class="formula">
+      a² = W² · (W¹ · a⁰ + b¹) + b² = W² · W¹ · a⁰ + (W² · b¹ + b²) = W' · a⁰ + b'
+    </div>
+
+    <p>
+      Ou seja: duas camadas sem ativação não-linear seriam <em>equivalentes a uma
+      única camada</em>. Profundidade só importa quando há não-linearidade.
+    </p>
+
+    <div class="analogy">
+      <span class="tag">Analogia · escadas curvas</span>
+      <p>
+        Pense em construir uma escada para subir uma colina íngreme. Se cada
+        degrau é uma rampa reta, várias rampas retas em sequência ainda são
+        uma rampa reta (só mais longa). Para fazer curvas e contornar a colina,
+        você precisa que <em>cada degrau curve</em>. A não-linearidade é o "dobrar
+        do degrau".
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ FORWARD ============ -->
+  <section class="block" id="forward">
+    <h2><span class="num">4</span> Forward pass passo a passo</h2>
+
+    <p>
+      O "forward pass" é o processo de pegar uma entrada e calcular a saída da
+      rede. Vamos seguir uma MLP de 2 camadas com 2 entradas, 3 neurônios ocultos
+      e 1 saída.
+    </p>
+
+    <h3>Passo 1: ativação da camada oculta</h3>
+    <div class="formula">
+      z₁⁽¹⁾ = w₁₁ x₁ + w₁₂ x₂ + b₁<br>
+      z₂⁽¹⁾ = w₂₁ x₁ + w₂₂ x₂ + b₂<br>
+      z₃⁽¹⁾ = w₃₁ x₁ + w₃₂ x₂ + b₃<br>
+      a⁽¹⁾ = σ(z⁽¹⁾)
+    </div>
+
+    <h3>Passo 2: ativação da camada de saída</h3>
+    <div class="formula">
+      z⁽²⁾ = w'₁ a₁⁽¹⁾ + w'₂ a₂⁽¹⁾ + w'₃ a₃⁽¹⁾ + b'<br>
+      ŷ = σ(z⁽²⁾)
+    </div>
+
+    <div class="tip">
+      <span class="tag">Em GPU</span>
+      <p>
+        Em vez de um exemplo por vez, todos os exemplos do batch viram colunas de
+        uma matriz <strong>X</strong>. A computação fica <strong>Z = W · X + b</strong> —
+        uma única multiplicação de matrizes que GPUs executam de forma absurdamente
+        rápida. Isso é o "vetorização" que permite treinar redes com milhões de
+        parâmetros em horas.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ PERDA ============ -->
+  <section class="block" id="perda">
+    <h2><span class="num">5</span> Funções de perda</h2>
+
+    <p>
+      A função de perda mede o quanto a previsão <strong>ŷ</strong> difere do valor
+      real <strong>y</strong>. É o que a rede tenta minimizar.
+    </p>
+
+    <h3>Mean Squared Error (MSE) — regressão</h3>
+    <div class="formula">
+      L = (1/N) Σ (yᵢ − ŷᵢ)²
+    </div>
+    <p>Quando você quer prever um número real (preço, temperatura, idade).</p>
+
+    <h3>Cross-Entropy — classificação</h3>
+    <div class="formula">
+      L = − Σ yᵢ · log(ŷᵢ)
+    </div>
+    <p>
+      Quando você quer prever uma classe. ŷ é uma distribuição de probabilidade
+      (saída do softmax), e a perda é a "surpresa" da classe correta.
+    </p>
+
+    <h3>Binary Cross-Entropy — classificação binária</h3>
+    <div class="formula">
+      L = − [y · log(ŷ) + (1−y) · log(1−ŷ)]
+    </div>
+
+    <div class="analogy">
+      <span class="tag">Analogia · cross-entropy</span>
+      <p>
+        Imagine que você aposta dinheiro na previsão do tempo. Se você diz "100%
+        sol" e chove, perde tudo (perda infinita). Se diz "50/50", perde só
+        metade. A cross-entropy pune apostas confiantes erradas e premia
+        apostas confiantes certas — é a perda perfeita para classificação.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ BACKPROP ============ -->
+  <section class="block" id="backprop">
+    <h2><span class="num">6</span> Backpropagation explicado</h2>
+
+    <p>
+      Backpropagation é, em essência, <strong>a regra da cadeia do cálculo</strong>
+      aplicada com inteligência. Queremos saber: "como o peso w influencia a perda L?"
+      A resposta é o gradiente ∂L/∂w. Backprop calcula isso de forma eficiente
+      para todos os pesos de uma vez.
+    </p>
+
+    <div class="analogy">
+      <span class="tag">Analogia · culpa em equipe</span>
+      <p>
+        Imagine um time de futebol que tomou um gol. O técnico (a perda) quer
+        distribuir a "culpa". O zagueiro falhou diretamente — culpa grande.
+        Mas o volante também falhou ao não roubar a bola antes — culpa intermediária.
+        E o atacante que perdeu posse de bola lá atrás — culpa também, embora menor.
+        Backprop é a forma <em>matematicamente correta</em> de distribuir a culpa
+        por toda a rede, proporcional a quanto cada peso contribuiu para o erro final.
+      </p>
+    </div>
+
+    <h3>A regra da cadeia em ação</h3>
+    <p>
+      Para uma rede com perda L, saída ŷ = σ(z), e z = wx + b:
+    </p>
+    <div class="formula">
+      <div class="fname">Regra da cadeia</div>
+      ∂L/∂w = ∂L/∂ŷ · ∂ŷ/∂z · ∂z/∂w
+    </div>
+    <p>
+      Lê-se: "o impacto de w em L é o produto de três efeitos: como L muda com ŷ,
+      como ŷ muda com z, e como z muda com w".
+    </p>
+
+    <h3>Backprop em uma MLP</h3>
+    <p>
+      Para uma rede de L camadas, definimos o "erro" na camada <em>l</em> como:
+    </p>
+    <div class="formula">
+      δ⁽ˡ⁾ = (W⁽ˡ⁺¹⁾)ᵀ · δ⁽ˡ⁺¹⁾ ⊙ σ'(z⁽ˡ⁾)
+    </div>
+    <p>
+      O ⊙ é o produto elemento a elemento (Hadamard). Essa fórmula diz: "o erro de
+      uma camada é o erro da próxima camada propagado para trás através dos pesos,
+      modulado pela derivada da ativação".
+    </p>
+
+    <h3>Os gradientes dos parâmetros</h3>
+    <div class="formula">
+      ∂L/∂W⁽ˡ⁾ = δ⁽ˡ⁾ · (a⁽ˡ⁻¹⁾)ᵀ<br>
+      ∂L/∂b⁽ˡ⁾ = δ⁽ˡ⁾
+    </div>
+
+    <div class="diagram">
+      <svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg">
+        <!-- camadas representadas como barras verticais -->
+        <rect x="60"  y="60" width="40" height="160" fill="#1f2952" stroke="#7aa2ff" stroke-width="2"/>
+        <text x="80"  y="50" text-anchor="middle" class="svg-label">camada 0</text>
+        <text x="80"  y="240" text-anchor="middle" class="svg-text">a⁽⁰⁾</text>
+
+        <rect x="220" y="60" width="40" height="160" fill="#1f2952" stroke="#b07aff" stroke-width="2"/>
+        <text x="240" y="50" text-anchor="middle" class="svg-label">camada 1</text>
+        <text x="240" y="240" text-anchor="middle" class="svg-text">a⁽¹⁾</text>
+
+        <rect x="380" y="60" width="40" height="160" fill="#1f2952" stroke="#b07aff" stroke-width="2"/>
+        <text x="400" y="50" text-anchor="middle" class="svg-label">camada 2</text>
+        <text x="400" y="240" text-anchor="middle" class="svg-text">a⁽²⁾</text>
+
+        <rect x="540" y="60" width="40" height="160" fill="#1f2952" stroke="#4fd1c5" stroke-width="2"/>
+        <text x="560" y="50" text-anchor="middle" class="svg-label">saída</text>
+        <text x="560" y="240" text-anchor="middle" class="svg-text">ŷ</text>
+
+        <!-- forward arrows -->
+        <path d="M100 100 L220 100" stroke="#4fd1c5" stroke-width="2" marker-end="url(#arrMF)"/>
+        <path d="M260 100 L380 100" stroke="#4fd1c5" stroke-width="2" marker-end="url(#arrMF)"/>
+        <path d="M420 100 L540 100" stroke="#4fd1c5" stroke-width="2" marker-end="url(#arrMF)"/>
+        <text x="155" y="90" class="svg-label">W⁽¹⁾</text>
+        <text x="315" y="90" class="svg-label">W⁽²⁾</text>
+        <text x="475" y="90" class="svg-label">W⁽³⁾</text>
+
+        <!-- backward arrows -->
+        <path d="M540 180 L420 180" stroke="#ff7a90" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#arrMB)"/>
+        <path d="M380 180 L260 180" stroke="#ff7a90" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#arrMB)"/>
+        <path d="M220 180 L100 180" stroke="#ff7a90" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#arrMB)"/>
+        <text x="475" y="200" fill="#ff7a90" class="svg-label">δ⁽³⁾</text>
+        <text x="315" y="200" fill="#ff7a90" class="svg-label">δ⁽²⁾</text>
+        <text x="155" y="200" fill="#ff7a90" class="svg-label">δ⁽¹⁾</text>
+
+        <!-- loss -->
+        <rect x="620" y="100" width="80" height="40" rx="8" fill="#ff7a90"/>
+        <text x="660" y="125" text-anchor="middle" fill="#fff" font-weight="700">L</text>
+        <path d="M580 130 L620 130" stroke="#4fd1c5" stroke-width="2"/>
+
+        <defs>
+          <marker id="arrMF" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#4fd1c5"/></marker>
+          <marker id="arrMB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#ff7a90"/></marker>
+        </defs>
+      </svg>
+      <div class="caption">Backprop computa os gradientes camada por camada, de trás para frente.</div>
+    </div>
+
+    <h3>O algoritmo em pseudo-código</h3>
+<pre class="code"><span class="com"># Forward pass</span>
+a[0] = x
+<span class="kw">for</span> l <span class="kw">in</span> range(1, L+1):
+    z[l] = W[l] @ a[l-1] + b[l]
+    a[l] = sigma(z[l])
+y_hat = a[L]
+loss = loss_function(y, y_hat)
+
+<span class="com"># Backward pass</span>
+delta[L] = (y_hat - y) * sigma_prime(z[L])    <span class="com"># para MSE</span>
+<span class="kw">for</span> l <span class="kw">in</span> range(L-1, 0, -1):
+    delta[l] = (W[l+1].T @ delta[l+1]) * sigma_prime(z[l])
+
+<span class="com"># Gradientes</span>
+<span class="kw">for</span> l <span class="kw">in</span> range(1, L+1):
+    dW[l] = delta[l] @ a[l-1].T
+    db[l] = delta[l]
+
+<span class="com"># Atualização</span>
+<span class="kw">for</span> l <span class="kw">in</span> range(1, L+1):
+    W[l] -= eta * dW[l]
+    b[l] -= eta * db[l]
+</pre>
+  </section>
+
+  <!-- ============ GRADIENT DESCENT ============ -->
+  <section class="block" id="gradiente">
+    <h2><span class="num">7</span> Gradient descent e otimizadores</h2>
+
+    <p>
+      Tendo os gradientes, atualizamos os pesos para reduzir a perda:
+    </p>
+    <div class="formula">
+      W ← W − η · ∂L/∂W
+    </div>
+
+    <p>
+      O η (eta) é a <strong>taxa de aprendizado</strong>. Muito alta, a rede oscila
+      sem convergir. Muito baixa, leva uma eternidade.
+    </p>
+
+    <div class="analogy">
+      <span class="tag">Analogia · descendo a montanha</span>
+      <p>
+        Imagine que você está numa montanha com neblina densa. Não vê para onde
+        ir, mas pode <em>sentir a inclinação do chão sob seus pés</em>. O gradient
+        descent é dar pequenos passos sempre na direção mais íngreme para baixo.
+        Com sorte, você chega ao vale (mínimo da perda). Com azar, fica preso em
+        um vale local que não é o mais profundo.
+      </p>
+    </div>
+
+    <h3>Variantes de gradient descent</h3>
+
+    <table class="compare">
+      <thead><tr><th>Variante</th><th>O que faz</th><th>Quando usar</th></tr></thead>
+      <tbody>
+        <tr><td>Batch GD</td><td>Usa o dataset inteiro a cada passo</td><td>Datasets pequenos (raríssimo hoje)</td></tr>
+        <tr><td>Stochastic GD</td><td>Um exemplo por passo</td><td>Streaming, online learning</td></tr>
+        <tr><td>Mini-batch GD</td><td>Lotes de 32-256 exemplos</td><td>Padrão de mercado</td></tr>
+        <tr><td>Momentum</td><td>Adiciona uma "inércia" ao passo</td><td>Acelera convergência em vales longos</td></tr>
+        <tr><td>RMSProp</td><td>Taxa de aprendizado por parâmetro</td><td>RNNs e dados não estacionários</td></tr>
+        <tr><td>Adam</td><td>Momentum + RMSProp combinados</td><td>Default na maioria dos projetos</td></tr>
+        <tr><td>AdamW</td><td>Adam com weight decay correto</td><td>Treinar Transformers</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ ATIVAÇÕES ============ -->
+  <section class="block" id="ativacoes">
+    <h2><span class="num">8</span> Funções de ativação</h2>
+
+    <div class="diagram">
+      <svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg">
+        <!-- sigmoid -->
+        <g transform="translate(20,10)">
+          <text x="80" y="15" text-anchor="middle" class="svg-text">Sigmoid</text>
+          <line x1="0" y1="100" x2="160" y2="100" stroke="#8089ad"/>
+          <line x1="80" y1="20"  x2="80"  y2="180" stroke="#8089ad"/>
+          <path d="M0 170 C 60 170, 80 100, 100 50 C 120 30, 160 30, 160 30" stroke="#7aa2ff" stroke-width="2.5" fill="none"/>
+          <text x="80" y="200" text-anchor="middle" class="svg-label">σ(z) = 1/(1+e⁻ᶻ)</text>
+        </g>
+        <!-- tanh -->
+        <g transform="translate(200,10)">
+          <text x="80" y="15" text-anchor="middle" class="svg-text">Tanh</text>
+          <line x1="0" y1="100" x2="160" y2="100" stroke="#8089ad"/>
+          <line x1="80" y1="20"  x2="80"  y2="180" stroke="#8089ad"/>
+          <path d="M0 170 C 50 170, 70 110, 80 100 C 90 90, 110 30, 160 30" stroke="#b07aff" stroke-width="2.5" fill="none"/>
+          <text x="80" y="200" text-anchor="middle" class="svg-label">tanh(z), saída [−1,1]</text>
+        </g>
+        <!-- ReLU -->
+        <g transform="translate(380,10)">
+          <text x="80" y="15" text-anchor="middle" class="svg-text">ReLU</text>
+          <line x1="0" y1="100" x2="160" y2="100" stroke="#8089ad"/>
+          <line x1="80" y1="20"  x2="80"  y2="180" stroke="#8089ad"/>
+          <line x1="0"  y1="100" x2="80"  y2="100" stroke="#4fd1c5" stroke-width="2.5"/>
+          <line x1="80" y1="100" x2="160" y2="20"  stroke="#4fd1c5" stroke-width="2.5"/>
+          <text x="80" y="200" text-anchor="middle" class="svg-label">max(0, z) — padrão atual</text>
+        </g>
+        <!-- Softmax (representação) -->
+        <g transform="translate(560,10)">
+          <text x="80" y="15" text-anchor="middle" class="svg-text">Softmax</text>
+          <rect x="20"  y="80" width="20" height="80" fill="#ffb86b" opacity="0.5"/>
+          <rect x="50"  y="50" width="20" height="110" fill="#ffb86b" opacity="0.7"/>
+          <rect x="80"  y="20" width="20" height="140" fill="#ffb86b" opacity="0.95"/>
+          <rect x="110" y="100" width="20" height="60" fill="#ffb86b" opacity="0.3"/>
+          <text x="80" y="200" text-anchor="middle" class="svg-label">distribuição de prob.</text>
+        </g>
+      </svg>
+      <div class="caption">As quatro ativações mais importantes. ReLU domina nas camadas ocultas; softmax na camada final de classificação.</div>
+    </div>
+
+    <h3>Por que ReLU virou o padrão (após 2010)</h3>
+    <ul>
+      <li><strong>Não satura</strong> em valores positivos — gradientes maiores.</li>
+      <li><strong>Esparsidade natural</strong> — metade dos neurônios "dormem" (z &lt; 0).</li>
+      <li><strong>Cálculo trivial</strong> — max(0, z) é mais barato que exponencial.</li>
+      <li><strong>Empiricamente</strong> treina mais rápido e melhor que sigmoid/tanh em redes profundas.</li>
+    </ul>
+
+    <h3>Variantes modernas</h3>
+    <ul>
+      <li><strong>Leaky ReLU</strong> — em vez de zero, deixa um pequeno escorrimento (0,01z) para z negativo.</li>
+      <li><strong>ELU / SELU</strong> — versões suaves que evitam neurônios "mortos".</li>
+      <li><strong>GELU</strong> — usada nos Transformers (BERT, GPT). Aproximação suave da ReLU.</li>
+      <li><strong>Swish / SiLU</strong> — descoberta pelo Google via busca de arquiteturas.</li>
+    </ul>
+  </section>
+
+  <!-- ============ TEOREMA ============ -->
+  <section class="block" id="teorema">
+    <h2><span class="num">9</span> O teorema da aproximação universal</h2>
+
+    <p>
+      Em 1989, <strong>George Cybenko</strong> provou um resultado bombástico: uma
+      rede neural com <em>uma única camada oculta</em> e neurônios sigmoid pode
+      aproximar <em>qualquer função contínua</em> em um intervalo limitado, com
+      precisão arbitrária, desde que se use neurônios suficientes.
+    </p>
+
+    <p>
+      <strong>Kurt Hornik</strong> generalizou em 1991: a propriedade não depende
+      da ativação sigmoid — qualquer função não-polinomial funciona.
+    </p>
+
+    <div class="callout">
+      <span class="tag">Não é tudo</span>
+      <p>
+        O teorema garante <em>existência</em>, não <em>treinabilidade</em>. Pode
+        existir uma rede de 1 camada que aproxima sua função, mas talvez sejam
+        necessários trilhões de neurônios. Na prática, <em>redes profundas</em>
+        com várias camadas são exponencialmente mais eficientes que redes rasas
+        para muitas funções importantes.
+      </p>
+    </div>
+
+    <h3>Por que profundidade é melhor que largura</h3>
+    <p>
+      Funções compostas (como reconhecer um rosto: pixels → bordas → olhos →
+      face) se beneficiam de representações hierárquicas. Cada camada constrói
+      sobre a anterior. Uma rede rasa precisaria "ver" todas essas hierarquias
+      simultaneamente — exponencialmente mais difícil.
+    </p>
+  </section>
+
+  <!-- ============ PROBLEMAS ============ -->
+  <section class="block" id="problemas">
+    <h2><span class="num">10</span> Problemas práticos do treino</h2>
+
+    <h3>Vanishing gradients</h3>
+    <p>
+      Em redes profundas com sigmoid/tanh, os gradientes se tornam minúsculos ao
+      retropropagarem por muitas camadas. As camadas iniciais quase não aprendem.
+      Soluções: ReLU, melhor inicialização (He, Xavier), batch normalization,
+      conexões residuais.
+    </p>
+
+    <h3>Exploding gradients</h3>
+    <p>
+      O oposto: gradientes crescem exponencialmente e os pesos divergem para
+      infinito. Solução: <strong>gradient clipping</strong> (cortar gradientes
+      acima de um limite).
+    </p>
+
+    <h3>Overfitting</h3>
+    <p>
+      A rede memoriza o treino mas falha em dados novos. Soluções:
+    </p>
+    <ul>
+      <li><strong>Dropout</strong> — desliga aleatoriamente 20-50% dos neurônios durante o treino.</li>
+      <li><strong>Weight decay</strong> (L2 regularization) — penaliza pesos grandes.</li>
+      <li><strong>Early stopping</strong> — para o treino quando o erro de validação para de cair.</li>
+      <li><strong>Data augmentation</strong> — gera variações dos dados de treino.</li>
+    </ul>
+
+    <h3>Mínimos locais e platôs</h3>
+    <p>
+      O gradient descent pode ficar preso. Soluções: momentum, taxa de aprendizado
+      adaptativa (Adam), múltiplas inicializações.
+    </p>
+
+    <h3>Sensibilidade à inicialização</h3>
+    <p>
+      Inicializar todos os pesos a zero não funciona — todos os neurônios aprendem
+      a mesma coisa. Iniciar com valores muito grandes faz a rede explodir.
+      Esquemas modernos (Xavier, He) escalam a inicialização com o número de
+      entradas e saídas de cada camada.
+    </p>
+  </section>
+
+  <!-- ============ EXEMPLO ============ -->
+  <section class="block" id="exemplo">
+    <h2><span class="num">11</span> Exemplo prático: XOR resolvido</h2>
+
+    <p>
+      Lembra do XOR que o perceptron simples não conseguia aprender? Vamos ver
+      como uma MLP minúscula (2 entradas, 2 ocultos, 1 saída) resolve com facilidade.
+    </p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 480 280" xmlns="http://www.w3.org/2000/svg">
+        <!-- x1, x2 -->
+        <circle cx="60" cy="80"  r="20" fill="#1f2952" stroke="#7aa2ff" stroke-width="2"/>
+        <text x="60" y="85" text-anchor="middle" class="svg-text">x₁</text>
+        <circle cx="60" cy="200" r="20" fill="#1f2952" stroke="#7aa2ff" stroke-width="2"/>
+        <text x="60" y="205" text-anchor="middle" class="svg-text">x₂</text>
+        <!-- h1, h2 -->
+        <circle cx="240" cy="80"  r="22" fill="#b07aff" opacity="0.85"/>
+        <text x="240" y="85" text-anchor="middle" fill="#fff" font-weight="700">h₁</text>
+        <text x="240" y="40" text-anchor="middle" class="svg-label">≈ OR</text>
+        <circle cx="240" cy="200" r="22" fill="#b07aff" opacity="0.85"/>
+        <text x="240" y="205" text-anchor="middle" fill="#fff" font-weight="700">h₂</text>
+        <text x="240" y="245" text-anchor="middle" class="svg-label">≈ AND</text>
+        <!-- y -->
+        <circle cx="420" cy="140" r="24" fill="#4fd1c5" opacity="0.9"/>
+        <text x="420" y="145" text-anchor="middle" fill="#0b1020" font-weight="700">y</text>
+        <text x="420" y="180" text-anchor="middle" class="svg-label">XOR</text>
+
+        <!-- linhas -->
+        <line x1="80" y1="80"  x2="220" y2="80"  stroke="#4fd1c5" stroke-width="1.5"/>
+        <line x1="80" y1="80"  x2="220" y2="200" stroke="#4fd1c5" stroke-width="1.5"/>
+        <line x1="80" y1="200" x2="220" y2="80"  stroke="#4fd1c5" stroke-width="1.5"/>
+        <line x1="80" y1="200" x2="220" y2="200" stroke="#4fd1c5" stroke-width="1.5"/>
+        <line x1="262" y1="80"  x2="400" y2="140" stroke="#4fd1c5" stroke-width="1.5"/>
+        <line x1="262" y1="200" x2="400" y2="140" stroke="#4fd1c5" stroke-width="1.5"/>
+      </svg>
+      <div class="caption">XOR pode ser escrito como "OR mas não AND". Um neurônio aprende OR, outro aprende AND, e a saída combina os dois.</div>
+    </div>
+
+    <h3>Em PyTorch</h3>
+<pre class="code"><span class="kw">import</span> torch
+<span class="kw">import</span> torch.nn <span class="kw">as</span> nn
+
+X = torch.tensor([[0,0],[0,1],[1,0],[1,1]], dtype=torch.float32)
+y = torch.tensor([[0],[1],[1],[0]],         dtype=torch.float32)
+
+model = nn.Sequential(
+    nn.Linear(2, 4),
+    nn.ReLU(),
+    nn.Linear(4, 1),
+    nn.Sigmoid()
+)
+
+loss_fn = nn.BCELoss()
+opt = torch.optim.Adam(model.parameters(), lr=0.05)
+
+<span class="kw">for</span> step <span class="kw">in</span> range(2000):
+    pred = model(X)
+    loss = loss_fn(pred, y)
+    opt.zero_grad()
+    loss.backward()
+    opt.step()
+
+<span class="fn">print</span>(model(X).round())   <span class="com"># [[0],[1],[1],[0]] após convergência</span>
+</pre>
+  </section>
+
+  <!-- ============ IMPLEMENTAÇÕES ============ -->
+  <section class="block" id="impl">
+    <h2><span class="num">12</span> Implementações</h2>
+
+    <div class="impl">
+      <div class="iname">PyTorch — <code>torch.nn.Sequential</code> + <code>nn.Linear</code></div>
+      <div class="idesc">A forma idiomática de construir MLPs hoje. Suporta autograd para backprop automático.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">TensorFlow / Keras — <code>tf.keras.Sequential</code> + <code>Dense</code></div>
+      <div class="idesc">API de alto nível do TensorFlow. Excelente para iniciantes.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">scikit-learn — <code>sklearn.neural_network.MLPClassifier</code></div>
+      <div class="idesc">Implementação simples para problemas tabulares. Boa para baseline.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">JAX + Flax / Haiku</div>
+      <div class="idesc">Framework funcional do Google que está crescendo em pesquisa avançada.</div>
+    </div>
+  </section>
+
+  <!-- ============ ARTIGOS ============ -->
+  <section class="block" id="artigos">
+    <h2><span class="num">13</span> Artigos seminais</h2>
+
+    <div class="papers">
+      <div class="paper">
+        <span class="pyear">1960</span><span class="ptitle">Gradient theory of optimal flight paths</span><br>
+        <span class="pauthors">Henry Kelley — ARS Journal</span>
+        <div class="psumm">Primeira aparição da ideia de propagação reversa do erro, no contexto de controle ótimo.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">1970</span><span class="ptitle">The representation of the cumulative rounding error of an algorithm as a Taylor expansion of the local rounding errors</span><br>
+        <span class="pauthors">Seppo Linnainmaa — tese de mestrado, Univ. Helsinki</span>
+        <div class="psumm">Diferenciação automática reversa — base matemática do backprop.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">1974</span><span class="ptitle">Beyond Regression: New Tools for Prediction and Analysis in the Behavioral Sciences</span><br>
+        <span class="pauthors">Paul Werbos — tese de doutorado, Harvard</span>
+        <div class="psumm">Aplica diferenciação automática reversa para treinar redes neurais multi-camadas.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">1986</span><span class="ptitle">Learning representations by back-propagating errors</span><br>
+        <span class="pauthors">David Rumelhart, Geoffrey Hinton, Ronald Williams — Nature, vol. 323</span>
+        <div class="psumm">O artigo que popularizou o backprop e iniciou o renascimento das redes neurais.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">1989</span><span class="ptitle">Approximation by superpositions of a sigmoidal function</span><br>
+        <span class="pauthors">George Cybenko — Mathematics of Control, Signals and Systems</span>
+        <div class="psumm">Prova do teorema da aproximação universal para redes sigmoid.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">1991</span><span class="ptitle">Multilayer Feedforward Networks are Universal Approximators</span><br>
+        <span class="pauthors">Kurt Hornik — Neural Networks</span>
+        <div class="psumm">Generaliza o teorema de Cybenko para qualquer ativação não-polinomial.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2010</span><span class="ptitle">Understanding the difficulty of training deep feedforward neural networks</span><br>
+        <span class="pauthors">Xavier Glorot, Yoshua Bengio — AISTATS</span>
+        <div class="psumm">Introduz a inicialização de Xavier/Glorot e analisa vanishing gradients.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2014</span><span class="ptitle">Dropout: A Simple Way to Prevent Neural Networks from Overfitting</span><br>
+        <span class="pauthors">Srivastava, Hinton, Krizhevsky, Sutskever, Salakhutdinov — JMLR</span>
+        <div class="psumm">Introduz o dropout, técnica de regularização padrão em redes neurais.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2014</span><span class="ptitle">Adam: A Method for Stochastic Optimization</span><br>
+        <span class="pauthors">Diederik Kingma, Jimmy Ba — ICLR</span>
+        <div class="psumm">Introduz o otimizador Adam, default na maioria dos projetos modernos.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2015</span><span class="ptitle">Batch Normalization: Accelerating Deep Network Training</span><br>
+        <span class="pauthors">Sergey Ioffe, Christian Szegedy — ICML</span>
+        <div class="psumm">Batch norm acelera e estabiliza o treino de redes profundas.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ APROFUNDAR ============ -->
+  <section class="block" id="aprofundar">
+    <h2><span class="num">14</span> Para se aprofundar</h2>
+
+    <h3>Livros essenciais</h3>
+    <ul>
+      <li><strong>Deep Learning</strong> — Goodfellow, Bengio, Courville (cap. 6-8) — o livro-bíblia.</li>
+      <li><strong>Neural Networks and Deep Learning</strong> — Michael Nielsen (livro online gratuito).</li>
+      <li><strong>Dive into Deep Learning</strong> — Aston Zhang et al. (livro interativo com código).</li>
+    </ul>
+
+    <h3>Vídeos didáticos</h3>
+    <ul>
+      <li><strong>3Blue1Brown — Neural Networks</strong> — série de 4 vídeos com animações lindas.</li>
+      <li><strong>Andrej Karpathy — Neural Networks: Zero to Hero</strong> — tutorial em código do zero.</li>
+      <li><strong>CS231n</strong> (Stanford) — aulas iniciais cobrem MLP a fundo.</li>
+    </ul>
+
+    <h3>Demos interativas</h3>
+    <ul>
+      <li><strong>TensorFlow Playground</strong> — playground.tensorflow.org</li>
+      <li><strong>Distill — "A Visual Tour of Backpropagation"</strong></li>
+    </ul>
+
+    <h3>Próximos passos</h3>
+    <p>
+      Com MLP + Backprop resolvidos, a próxima fronteira eram redes capazes de
+      lidar com estrutura: <a href="cnn.html">CNNs</a> para imagens e
+      <a href="rnn.html">RNNs</a> para sequências.
+    </p>
+  </section>
+
+  <a href="cnn.html" class="deeplink">
+    <span class="arrow">→</span>
+    <span class="dt">Próxima arquitetura</span>
+    <span class="dn">CNN — Redes Convolucionais</span>
+  </a>
+
+  <footer>
+    <p>Página detalhada · MLP + Backpropagation · Parte do projeto <a href="index.html">Histórico de Evolução dos Modelos de IA</a></p>
+  </footer>
+</div>
+</body>
+</html>

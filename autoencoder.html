@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Autoencoders e VAE — Página Detalhada</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <nav class="topnav">
+    <a href="index.html">← Voltar ao índice</a>
+    <span class="crumbs">Arquitetura · anos 80 / 2013</span>
+  </nav>
+
+  <header class="hero">
+    <div class="eyebrow">Comprimir, reconstruir, gerar · anos 80 → 2013</div>
+    <h1>Autoencoders e VAE</h1>
+    <p class="lead">
+      Uma rede neural que aprende a copiar sua entrada para a saída pode parecer
+      inútil — até que você force ela a passar por um <em>gargalo</em>. Aí ela é
+      obrigada a comprimir, e nesse processo aprende as feições essenciais dos
+      dados. Adicione um truque probabilístico e ela vira um gerador.
+    </p>
+  </header>
+
+  <div class="toc">
+    <h4>Sumário</h4>
+    <ol>
+      <li><a href="#ideia">A ideia central</a></li>
+      <li><a href="#anatomia">Anatomia de um autoencoder</a></li>
+      <li><a href="#tipos">Tipos de autoencoder</a></li>
+      <li><a href="#denoising">Denoising autoencoder</a></li>
+      <li><a href="#sparse">Sparse autoencoder</a></li>
+      <li><a href="#vae">VAE — o autoencoder probabilístico</a></li>
+      <li><a href="#latente">O espaço latente</a></li>
+      <li><a href="#vqvae">VQ-VAE — latente discreto</a></li>
+      <li><a href="#anomalia">Detecção de anomalias</a></li>
+      <li><a href="#geracao">Geração de novos dados</a></li>
+      <li><a href="#aplicacoes">Aplicações</a></li>
+      <li><a href="#impl">Implementações</a></li>
+      <li><a href="#artigos">Artigos seminais</a></li>
+      <li><a href="#aprofundar">Para se aprofundar</a></li>
+    </ol>
+  </div>
+
+  <!-- ============ IDEIA ============ -->
+  <section class="block" id="ideia">
+    <h2><span class="num">1</span> A ideia central</h2>
+
+    <p>
+      Um autoencoder é uma rede neural treinada para uma tarefa que parece sem
+      sentido: <strong>copiar a entrada para a saída</strong>. Por que treinar
+      uma rede para isso? Porque entre a entrada e a saída há um <em>gargalo</em>:
+      uma camada intermediária com bem menos dimensões. A rede é forçada a
+      comprimir a entrada nessa camada, e depois reconstruir a partir da
+      compressão.
+    </p>
+
+    <p>
+      Para fazer isso bem, a rede precisa <strong>descobrir as feições mais
+      importantes dos dados</strong>. Imagine comprimir 100.000 dígitos
+      manuscritos do MNIST em códigos de 32 dimensões: a rede aprende que os
+      dígitos têm <em>traços</em>, <em>curvas</em>, <em>inclinações</em>. Tudo
+      sem rótulos.
+    </p>
+
+    <div class="analogy">
+      <span class="tag">Analogia 1 · sumarizar e reconstruir</span>
+      <p>
+        Imagine pedir a um amigo: <em>"resuma este livro em 5 palavras"</em>.
+        Depois, peça a outro amigo: <em>"escreva o livro original a partir dessas
+        5 palavras"</em>. O primeiro é o encoder, o segundo é o decoder, e as 5
+        palavras são o código latente. Para o segundo conseguir, o primeiro
+        precisa escolher as 5 palavras certas — a essência do livro.
+      </p>
+    </div>
+
+    <div class="analogy">
+      <span class="tag">Analogia 2 · ampulheta</span>
+      <p>
+        Visualize uma ampulheta. O grão de areia entra pelo topo (alta
+        dimensão), passa pelo pescoço estreito (espaço latente), e cai no fundo
+        (reconstrução). O pescoço é o que força a compressão.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ ANATOMIA ============ -->
+  <section class="block" id="anatomia">
+    <h2><span class="num">2</span> Anatomia de um autoencoder</h2>
+
+    <p>Dois componentes:</p>
+    <ul>
+      <li><strong>Encoder f</strong>: mapeia entrada x → código latente z.</li>
+      <li><strong>Decoder g</strong>: mapeia z → reconstrução x̂.</li>
+    </ul>
+
+    <div class="formula">
+      z  = f(x)<br>
+      x̂ = g(z)<br>
+      perda = ||x − x̂||²
+    </div>
+
+    <p>
+      A perda padrão é o erro quadrático médio (MSE). Para imagens, pode-se usar
+      também binary cross-entropy se os pixels são binarizados.
+    </p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg">
+        <!-- entrada -->
+        <rect x="20" y="40" width="80" height="200" rx="8" fill="#1f2952" stroke="#7aa2ff" stroke-width="2"/>
+        <text x="60" y="150" text-anchor="middle" class="svg-text">x</text>
+        <text x="60" y="25" text-anchor="middle" class="svg-label">entrada</text>
+
+        <!-- encoder -->
+        <polygon points="120,40 280,90 280,190 120,240" fill="#b07aff" opacity="0.85"/>
+        <text x="200" y="155" text-anchor="middle" fill="#fff" font-weight="700">encoder f</text>
+
+        <!-- gargalo -->
+        <rect x="310" y="100" width="60" height="60" rx="8" fill="#ffb86b" opacity="0.9"/>
+        <text x="340" y="140" text-anchor="middle" fill="#0b1020" font-weight="700">z</text>
+        <text x="340" y="90" text-anchor="middle" class="svg-label">código latente</text>
+
+        <!-- decoder -->
+        <polygon points="400,90 400,190 560,240 560,40" fill="#7aa2ff" opacity="0.85"/>
+        <text x="480" y="155" text-anchor="middle" fill="#fff" font-weight="700">decoder g</text>
+
+        <!-- saída -->
+        <rect x="580" y="40" width="80" height="200" rx="8" fill="#1f2952" stroke="#4fd1c5" stroke-width="2"/>
+        <text x="620" y="150" text-anchor="middle" class="svg-text">x̂</text>
+        <text x="620" y="25" text-anchor="middle" class="svg-label">reconstrução</text>
+
+        <text x="340" y="270" text-anchor="middle" fill="#ff7a90" font-weight="700">perda = ||x − x̂||²</text>
+      </svg>
+      <div class="caption">Encoder comprime; decoder reconstrói. A perda mede a fidelidade da reconstrução.</div>
+    </div>
+
+    <h3>Por que isso funciona</h3>
+    <p>
+      Se o gargalo tem menos dimensões que a entrada, a rede <em>não pode</em>
+      memorizar pixel por pixel — é fisicamente impossível. Ela precisa
+      identificar padrões compartilhados entre exemplos e codificá-los
+      eficientemente. Esse é o aprendizado de representações.
+    </p>
+  </section>
+
+  <!-- ============ TIPOS ============ -->
+  <section class="block" id="tipos">
+    <h2><span class="num">3</span> Tipos de autoencoder</h2>
+
+    <h3>Undercomplete autoencoder</h3>
+    <p>
+      O caso padrão: dimensão do gargalo &lt; dimensão da entrada. Força
+      compressão.
+    </p>
+
+    <h3>Overcomplete autoencoder</h3>
+    <p>
+      Dimensão do gargalo &gt; dimensão da entrada. Sem restrições extras,
+      a rede aprende a copiar (identidade) e não aprende nada útil. Precisa
+      de regularização — daí surgem o sparse e o denoising.
+    </p>
+
+    <h3>Deep autoencoder</h3>
+    <p>
+      Encoder e decoder com várias camadas. Foi proposto por Hinton e
+      Salakhutdinov em 2006 (Science). Cada par de camadas era pré-treinado
+      separadamente com Restricted Boltzmann Machines — uma técnica
+      precursora antes do treino end-to-end virar prático.
+    </p>
+
+    <h3>Convolutional autoencoder</h3>
+    <p>
+      Para imagens: encoder com convoluções e poolings (reduz dimensão);
+      decoder com convoluções transpostas (upsampling). Base de muitos
+      sistemas de denoising e super-resolution.
+    </p>
+  </section>
+
+  <!-- ============ DENOISING ============ -->
+  <section class="block" id="denoising">
+    <h2><span class="num">4</span> Denoising autoencoder</h2>
+
+    <p>
+      Em vez de receber a entrada limpa, a rede recebe uma versão
+      <strong>corrompida</strong> (com ruído gaussiano, zeros aleatórios,
+      borrões). Sua tarefa é reconstruir a versão limpa.
+    </p>
+
+    <div class="formula">
+      x̃ = x + ruído<br>
+      z = f(x̃)<br>
+      x̂ = g(z)<br>
+      perda = ||x − x̂||² (compara com o original limpo!)
+    </div>
+
+    <p>
+      Isso obriga a rede a aprender a <strong>essência</strong> do dado —
+      ela não pode simplesmente memorizar, porque a entrada está sempre
+      diferente. Vincent et al. (2008) mostraram que isso aprende
+      representações muito mais úteis para tarefas downstream.
+    </p>
+
+    <div class="analogy">
+      <span class="tag">Analogia · arqueólogo</span>
+      <p>
+        Pense num arqueólogo reconstituindo um vaso quebrado. Ele recebe
+        cacos (entrada ruidosa) e precisa imaginar como era o vaso inteiro
+        (saída limpa). Para conseguir, ele precisa <em>entender</em> o que
+        é um vaso — sua estrutura, simetria, função.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ SPARSE ============ -->
+  <section class="block" id="sparse">
+    <h2><span class="num">5</span> Sparse autoencoder</h2>
+
+    <p>
+      Adiciona uma penalidade na função de perda que força a maioria dos
+      neurônios do gargalo a serem zero. Resultado: cada exemplo ativa apenas
+      <em>poucos</em> neurônios — esparsamente.
+    </p>
+
+    <div class="formula">
+      perda = ||x − x̂||² + λ · |z|₁  (penalidade L1)
+    </div>
+
+    <p>
+      Isso emula a teoria de "códigos esparsos" do córtex visual (Olshausen e
+      Field, 1996): neurônios reais são especializados, e qualquer estímulo
+      ativa apenas uma pequena fração deles.
+    </p>
+
+    <div class="callout">
+      <span class="tag">Conexão com LLMs modernos</span>
+      <p>
+        A Anthropic publicou em 2024 um trabalho chamado "Scaling Monosemanticity"
+        usando <em>sparse autoencoders</em> para extrair features interpretáveis
+        de LLMs. Esse é um dos maiores ressurgimentos de sparse autoencoders dos
+        últimos tempos — um clássico voltando para entender modelos modernos.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ VAE ============ -->
+  <section class="block" id="vae">
+    <h2><span class="num">6</span> VAE — o autoencoder probabilístico</h2>
+
+    <p>
+      Em 2013, <strong>Diederik Kingma</strong> e <strong>Max Welling</strong>
+      publicaram "Auto-Encoding Variational Bayes" e mudaram o jogo. A ideia:
+      em vez de o encoder produzir um único vetor z, ele produz <em>parâmetros
+      de uma distribuição probabilística</em> (média μ e desvio padrão σ).
+      Para reconstruir, amostra-se z dessa distribuição.
+    </p>
+
+    <div class="formula">
+      μ, log σ² = encoder(x)<br>
+      z = μ + σ · ε     (ε ~ N(0, I), reparametrization trick)<br>
+      x̂ = decoder(z)
+    </div>
+
+    <h3>O reparametrization trick</h3>
+    <p>
+      Amostrar z ~ N(μ, σ²) diretamente não é diferenciável. Truque: reescreva
+      como z = μ + σ · ε, onde ε vem de uma normal padrão fixa. Agora o
+      gradiente flui por μ e σ, mas o "ruído" ε é tratado como entrada
+      aleatória. Genial.
+    </p>
+
+    <h3>A função de perda do VAE</h3>
+    <div class="formula">
+      L = ||x − x̂||² + β · KL(q(z|x) || p(z))
+    </div>
+    <p>
+      Duas partes:
+    </p>
+    <ul>
+      <li><strong>Reconstrução</strong> — mesma do autoencoder normal.</li>
+      <li><strong>KL divergência</strong> — força a distribuição q(z|x) a se aproximar de uma normal padrão p(z) = N(0, I). Sem isso, o latente vira uma bagunça e a amostragem não funciona.</li>
+    </ul>
+
+    <h3>β-VAE</h3>
+    <p>
+      Ajustar o coeficiente β controla o tradeoff entre reconstrução fiel
+      (β baixo) e latente bem-comportado / desentrelaçado (β alto). β-VAE
+      (Higgins et al., 2017) levou ao estudo de "disentangled representations".
+    </p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 760 240" xmlns="http://www.w3.org/2000/svg">
+        <!-- entrada -->
+        <rect x="20" y="60" width="60" height="120" rx="8" fill="#1f2952" stroke="#7aa2ff" stroke-width="2"/>
+        <text x="50" y="125" text-anchor="middle" class="svg-text">x</text>
+
+        <!-- encoder -->
+        <polygon points="100,60 230,90 230,150 100,180" fill="#b07aff" opacity="0.85"/>
+        <text x="170" y="125" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">encoder</text>
+
+        <!-- mu e sigma -->
+        <rect x="260" y="60" width="60" height="40" rx="6" fill="#ffb86b" opacity="0.9"/>
+        <text x="290" y="85" text-anchor="middle" fill="#0b1020" font-weight="700">μ</text>
+        <rect x="260" y="140" width="60" height="40" rx="6" fill="#ffb86b" opacity="0.9"/>
+        <text x="290" y="165" text-anchor="middle" fill="#0b1020" font-weight="700">σ</text>
+
+        <!-- z -->
+        <circle cx="400" cy="120" r="28" fill="#4fd1c5" opacity="0.9"/>
+        <text x="400" y="125" text-anchor="middle" fill="#0b1020" font-weight="700">z</text>
+        <text x="400" y="170" text-anchor="middle" class="svg-label">z = μ + σ·ε</text>
+        <text x="400" y="185" text-anchor="middle" class="svg-label">ε ~ N(0,I)</text>
+
+        <line x1="320" y1="80" x2="375" y2="110" stroke="#ffb86b" stroke-width="1.5"/>
+        <line x1="320" y1="160" x2="375" y2="130" stroke="#ffb86b" stroke-width="1.5"/>
+
+        <!-- decoder -->
+        <polygon points="440,90 440,150 570,180 570,60" fill="#7aa2ff" opacity="0.85"/>
+        <text x="510" y="125" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">decoder</text>
+
+        <!-- saída -->
+        <rect x="600" y="60" width="60" height="120" rx="8" fill="#1f2952" stroke="#4fd1c5" stroke-width="2"/>
+        <text x="630" y="125" text-anchor="middle" class="svg-text">x̂</text>
+
+        <text x="370" y="220" text-anchor="middle" fill="#ff7a90" font-size="13" font-weight="700">L = ||x−x̂||² + β · KL(q(z|x) || N(0,I))</text>
+      </svg>
+      <div class="caption">VAE: encoder produz μ e σ; z é amostrado dessa distribuição; decoder reconstrói. Treino minimiza reconstrução + divergência KL.</div>
+    </div>
+  </section>
+
+  <!-- ============ LATENTE ============ -->
+  <section class="block" id="latente">
+    <h2><span class="num">7</span> O espaço latente</h2>
+
+    <p>
+      Uma das coisas mais lindas do VAE é seu <strong>espaço latente
+      contínuo</strong>. Como a KL força z a se distribuir como N(0, I),
+      <em>qualquer ponto z amostrado da normal</em> tende a decodificar em
+      algo plausível.
+    </p>
+
+    <h3>Interpolação no latente</h3>
+    <p>
+      Pegue dois exemplos x₁ e x₂. Codifique para z₁ e z₂. Crie pontos
+      intermediários z(t) = (1-t)·z₁ + t·z₂ para t ∈ [0,1]. Decodifique
+      cada um. Você verá uma <strong>transição suave</strong> entre as imagens —
+      um rosto morfando para outro, um 4 virando 9, etc.
+    </p>
+
+    <h3>Aritmética latente</h3>
+    <p>
+      Em representações de rostos, vetores como "óculos" e "barba" podem ser
+      <em>somados</em> ou <em>subtraídos</em> para criar combinações novas.
+      "Imagem de pessoa com óculos" − "imagem de pessoa sem óculos" ≈ "vetor
+      óculos". Aplicar esse vetor a outra pessoa adiciona óculos a ela.
+      (Demonstrado tanto em VAEs quanto em GANs.)
+    </p>
+
+    <div class="analogy">
+      <span class="tag">Analogia · mapa do tesouro</span>
+      <p>
+        Imagine o espaço latente como um mapa cartográfico. Cada ponto é uma
+        possível imagem. Pontos próximos no mapa correspondem a imagens
+        semelhantes. Você pode caminhar por esse mapa e gerar variações
+        suaves. Sem a KL, esse mapa estaria cheio de "buracos" (regiões que
+        decodificam em imagens ruins). Com a KL, o mapa fica conexo.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ VQVAE ============ -->
+  <section class="block" id="vqvae">
+    <h2><span class="num">8</span> VQ-VAE — latente discreto</h2>
+
+    <p>
+      <strong>VQ-VAE</strong> (Vector Quantized VAE, van den Oord et al., 2017):
+      em vez de o latente ser contínuo, ele é discreto — escolhido de um
+      "codebook" finito de vetores. É como ter um vocabulário fixo de "palavras
+      latentes".
+    </p>
+
+    <p>
+      Por que isso importa? Latentes discretos permitem combinar VAEs com modelos
+      autoregressivos (Transformers!). É a base do DALL-E original (2021):
+      VQ-VAE comprime a imagem em tokens discretos, e um Transformer gera esses
+      tokens condicionados em texto.
+    </p>
+
+    <h3>Outros descendentes</h3>
+    <ul>
+      <li><strong>VQ-GAN</strong> (Esser et al., 2021) — VQ-VAE com adversarial loss para melhor qualidade.</li>
+      <li><strong>Stable Diffusion latent</strong> — autoencoder convolutivo que comprime imagens 512×512 para 64×64×4 antes da difusão.</li>
+    </ul>
+  </section>
+
+  <!-- ============ ANOMALIA ============ -->
+  <section class="block" id="anomalia">
+    <h2><span class="num">9</span> Detecção de anomalias</h2>
+
+    <p>
+      Uma aplicação industrial clássica: treine um autoencoder em dados
+      <strong>normais</strong> apenas. Em produção, calcule o erro de
+      reconstrução de cada novo exemplo. Se for muito alto, é uma anomalia
+      (o autoencoder nunca aprendeu a reconstruir esse padrão).
+    </p>
+
+    <h3>Exemplos práticos</h3>
+    <ul>
+      <li><strong>Detecção de defeitos</strong> em peças industriais — fábricas treinam autoencoders em fotos de peças boas; peças defeituosas reconstroem mal.</li>
+      <li><strong>Fraude financeira</strong> — transações normais reconstroem bem; padrões anômalos disparam alertas.</li>
+      <li><strong>Monitoramento de redes</strong> — pacotes de rede anômalos têm alto erro.</li>
+      <li><strong>Diagnóstico médico</strong> — exames atípicos disparam segunda revisão humana.</li>
+    </ul>
+  </section>
+
+  <!-- ============ GERAÇÃO ============ -->
+  <section class="block" id="geracao">
+    <h2><span class="num">10</span> Geração de novos dados</h2>
+
+    <p>
+      Com um VAE treinado, gerar dados novos é trivial:
+    </p>
+    <ol>
+      <li>Amostre z ~ N(0, I).</li>
+      <li>Passe por g (decoder).</li>
+      <li>Pronto: x̂ é um exemplo novo, parecido com os de treino.</li>
+    </ol>
+
+    <h3>Limitações</h3>
+    <p>
+      VAEs geram imagens <strong>borradas</strong>. A razão é matemática:
+      minimizar MSE empurra a saída para a <em>média</em> de todas as
+      possíveis reconstruções, e a média de várias faces nítidas é uma face
+      borrada. Por isso, para geração visual de alta qualidade, dominam:
+    </p>
+    <ul>
+      <li><strong>GANs</strong> (até ~2021) — sem MSE, usam adversarial loss.</li>
+      <li><strong>Modelos de difusão</strong> (Stable Diffusion, DALL-E 2, Midjourney) — desde 2021-2022.</li>
+    </ul>
+
+    <p>
+      Mesmo assim, autoencoders são <em>peças</em> dos modelos modernos:
+      Stable Diffusion usa um autoencoder para comprimir imagens antes da
+      difusão.
+    </p>
+  </section>
+
+  <!-- ============ APLICAÇÕES ============ -->
+  <section class="block" id="aplicacoes">
+    <h2><span class="num">11</span> Aplicações</h2>
+
+    <ul>
+      <li><strong>Compressão de imagens / áudio</strong> — neural compression bate JPEG e MP3 em qualidade por taxa.</li>
+      <li><strong>Denoising</strong> — remover ruído de fotos, gravações, exames médicos.</li>
+      <li><strong>Super-resolution</strong> — aumentar resolução de imagens.</li>
+      <li><strong>Geração</strong> — VAE, VQ-VAE como blocos de modelos generativos modernos.</li>
+      <li><strong>Detecção de anomalias</strong> — indústria, finanças, cibersegurança.</li>
+      <li><strong>Aprendizado de representações</strong> — pré-treino para tarefas downstream.</li>
+      <li><strong>Visualização de dados</strong> — t-SNE e UMAP fazem algo conceitualmente similar.</li>
+      <li><strong>Recomendação</strong> — colaborative filtering com VAEs.</li>
+      <li><strong>Drug discovery</strong> — VAEs de SMILES para explorar moléculas.</li>
+      <li><strong>Interpretabilidade de LLMs</strong> — sparse autoencoders sobre ativações de modelos grandes.</li>
+    </ul>
+  </section>
+
+  <!-- ============ IMPL ============ -->
+  <section class="block" id="impl">
+    <h2><span class="num">12</span> Implementações</h2>
+
+    <div class="impl">
+      <div class="iname">PyTorch</div>
+      <div class="idesc">Implementar um autoencoder em ~20 linhas. <code>nn.Sequential</code> para encoder e decoder, <code>nn.MSELoss</code>.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">Keras Examples — Variational Autoencoder</div>
+      <div class="idesc">Tutoriais oficiais cobrem VAE com MNIST e Fashion-MNIST.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">PyTorch VAE</div>
+      <div class="idesc">Repositório de Anand Subramanian com dezenas de variantes (β-VAE, IWAE, VQ-VAE, etc.).</div>
+    </div>
+    <div class="impl">
+      <div class="iname">Disentanglement Lib (Google)</div>
+      <div class="idesc">Implementações de β-VAE, FactorVAE, β-TCVAE para pesquisa em representações desentrelaçadas.</div>
+    </div>
+    <div class="impl">
+      <div class="iname">Stable Diffusion VAE</div>
+      <div class="idesc">Autoencoder convolutivo usado no Stable Diffusion para reduzir dimensionalidade antes da difusão.</div>
+    </div>
+  </section>
+
+  <!-- ============ ARTIGOS ============ -->
+  <section class="block" id="artigos">
+    <h2><span class="num">13</span> Artigos seminais</h2>
+    <div class="papers">
+      <div class="paper">
+        <span class="pyear">1986</span><span class="ptitle">Learning internal representations by error propagation</span><br>
+        <span class="pauthors">Rumelhart, Hinton, Williams</span>
+        <div class="psumm">Discute autoencoders como caso particular de redes treinadas por backprop.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">1996</span><span class="ptitle">Emergence of simple-cell receptive field properties by learning a sparse code for natural images</span><br>
+        <span class="pauthors">Bruno Olshausen, David Field — Nature</span>
+        <div class="psumm">Base teórica para sparse coding — predecessor dos sparse autoencoders.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2006</span><span class="ptitle">Reducing the Dimensionality of Data with Neural Networks</span><br>
+        <span class="pauthors">Geoffrey Hinton, Ruslan Salakhutdinov — Science</span>
+        <div class="psumm">Deep autoencoders com pré-treino RBM. Marco da retomada do interesse em redes profundas.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2008</span><span class="ptitle">Extracting and composing robust features with denoising autoencoders</span><br>
+        <span class="pauthors">Pascal Vincent, Hugo Larochelle, Yoshua Bengio, Pierre-Antoine Manzagol — ICML</span>
+        <div class="psumm">Introduz denoising autoencoders como pré-treino para deep nets.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2013</span><span class="ptitle">Auto-Encoding Variational Bayes (VAE)</span><br>
+        <span class="pauthors">Diederik Kingma, Max Welling — ICLR</span>
+        <div class="psumm">O artigo fundador do VAE. Introduz o reparametrization trick.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2014</span><span class="ptitle">Stochastic Backpropagation and Approximate Inference in Deep Generative Models</span><br>
+        <span class="pauthors">Danilo Rezende, Shakir Mohamed, Daan Wierstra — DeepMind</span>
+        <div class="psumm">Versão paralela ao VAE, mesma matemática, contexto Bayesiano.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2017</span><span class="ptitle">β-VAE: Learning Basic Visual Concepts with a Constrained Variational Framework</span><br>
+        <span class="pauthors">Higgins et al. — ICLR</span>
+        <div class="psumm">Mostra que aumentar β leva a representações desentrelaçadas.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2017</span><span class="ptitle">Neural Discrete Representation Learning (VQ-VAE)</span><br>
+        <span class="pauthors">Aäron van den Oord, Oriol Vinyals, Koray Kavukcuoglu — DeepMind</span>
+        <div class="psumm">VAE com latente discreto via vector quantization. Base do DALL-E original.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2021</span><span class="ptitle">Taming Transformers for High-Resolution Image Synthesis (VQ-GAN)</span><br>
+        <span class="pauthors">Patrick Esser, Robin Rombach, Björn Ommer — CVPR</span>
+        <div class="psumm">VQ-VAE + adversarial loss = qualidade dramaticamente melhor.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2022</span><span class="ptitle">High-Resolution Image Synthesis with Latent Diffusion Models</span><br>
+        <span class="pauthors">Rombach et al. — CVPR</span>
+        <div class="psumm">Stable Diffusion: difusão no espaço latente de um autoencoder.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2024</span><span class="ptitle">Scaling Monosemanticity</span><br>
+        <span class="pauthors">Anthropic Interpretability Team</span>
+        <div class="psumm">Sparse autoencoders extraem features interpretáveis de Claude 3 Sonnet.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ APROFUNDAR ============ -->
+  <section class="block" id="aprofundar">
+    <h2><span class="num">14</span> Para se aprofundar</h2>
+
+    <ul>
+      <li><strong>Tutorial on Variational Autoencoders</strong> — Carl Doersch (2016), 23 páginas. Excelente material introdutório.</li>
+      <li><strong>fast.ai Lesson on VAEs</strong> — implementação prática.</li>
+      <li><strong>Lilian Weng — "From Autoencoder to Beta-VAE"</strong> (blog post).</li>
+      <li><strong>3Blue1Brown — sobre VAEs</strong> em desenvolvimento.</li>
+    </ul>
+  </section>
+
+  <a href="gan.html" class="deeplink">
+    <span class="arrow">→</span>
+    <span class="dt">Próxima arquitetura</span>
+    <span class="dn">GAN — Redes Adversariais</span>
+  </a>
+
+  <footer>
+    <p>Página detalhada · Autoencoders e VAE · Parte do projeto <a href="index.html">Histórico de Evolução dos Modelos de IA</a></p>
+  </footer>
+</div>
+</body>
+</html>

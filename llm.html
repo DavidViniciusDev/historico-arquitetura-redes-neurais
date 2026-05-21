@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LLMs Modernos — Página Detalhada</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <nav class="topnav">
+    <a href="index.html">← Voltar ao índice</a>
+    <span class="crumbs">Arquitetura · 2018 → hoje</span>
+  </nav>
+
+  <header class="hero">
+    <div class="eyebrow">A era da escala · 2018 → presente</div>
+    <h1>LLMs Modernos</h1>
+    <p class="lead">
+      Quando o Transformer foi treinado em <em>trilhões</em> de tokens e
+      bilhões de parâmetros, algo surpreendente aconteceu: capacidades
+      <em>emergiram</em>. Raciocínio, código, tradução, sumarização — tudo do
+      mesmo modelo, sem mudar a arquitetura, só escalando. Estamos vivendo o
+      momento mais transformador da história da IA.
+    </p>
+  </header>
+
+  <div class="toc">
+    <h4>Sumário</h4>
+    <ol>
+      <li><a href="#paradigma">O paradigma: pré-treino + fine-tuning + RLHF</a></li>
+      <li><a href="#linhagem">A linhagem dos LLMs (2018-2024)</a></li>
+      <li><a href="#tres">Três famílias de Transformers</a></li>
+      <li><a href="#scaling">As leis de escala</a></li>
+      <li><a href="#emergencia">Capacidades emergentes</a></li>
+      <li><a href="#tokens">Tokenização e vocabulário</a></li>
+      <li><a href="#pretreino">Pré-treino: detalhes</a></li>
+      <li><a href="#sft">SFT — Supervised Fine-Tuning</a></li>
+      <li><a href="#rlhf">RLHF — feedback humano</a></li>
+      <li><a href="#constitutional">Constitutional AI (Anthropic)</a></li>
+      <li><a href="#prompting">Prompting, CoT, few-shot</a></li>
+      <li><a href="#tools">Agentes e ferramentas</a></li>
+      <li><a href="#multimodal">Multimodalidade</a></li>
+      <li><a href="#problemas">Problemas conhecidos</a></li>
+      <li><a href="#futuro">O futuro próximo</a></li>
+      <li><a href="#artigos">Artigos marcantes</a></li>
+      <li><a href="#aprofundar">Para se aprofundar</a></li>
+    </ol>
+  </div>
+
+  <!-- ============ PARADIGMA ============ -->
+  <section class="block" id="paradigma">
+    <h2><span class="num">1</span> O paradigma: pré-treino + fine-tuning + RLHF</h2>
+
+    <p>
+      A revolução dos LLMs não veio só da arquitetura Transformer. Veio também
+      de uma <strong>receita de treino</strong> em três fases:
+    </p>
+
+    <ol>
+      <li>
+        <strong>Pré-treino (pretraining)</strong> — o modelo lê bilhões/trilhões
+        de tokens da internet, livros, código, etc. Aprende a prever a próxima
+        palavra. Esse passo dura semanas/meses em milhares de GPUs/TPUs.
+      </li>
+      <li>
+        <strong>Supervised fine-tuning (SFT)</strong> — humanos demonstram
+        respostas para tarefas variadas (perguntas, resumos, código). O modelo
+        é ajustado nesse dataset menor mas de alta qualidade.
+      </li>
+      <li>
+        <strong>RLHF — Reinforcement Learning from Human Feedback</strong> —
+        humanos comparam pares de respostas dizendo qual é melhor. Treina-se
+        um "reward model" e otimiza-se o LLM contra ele com PPO ou DPO. Resultado:
+        respostas mais úteis, honestas e seguras.
+      </li>
+    </ol>
+
+    <div class="analogy">
+      <span class="tag">Analogia · o estudante</span>
+      <p>
+        Pense num estudante que primeiro <strong>lê toda a biblioteca da
+        humanidade</strong> (pré-treino). Sabe muito, mas é confuso sobre como
+        responder educadamente. Depois, <strong>faz cursos específicos com
+        exercícios resolvidos</strong> (SFT). Por fim, <strong>tem tutorias
+        individuais com professores</strong> que lhe dão feedback constante
+        sobre qual resposta é melhor (RLHF). O resultado: alguém que sabe,
+        sabe aplicar, e sabe se comportar.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ LINHAGEM ============ -->
+  <section class="block" id="linhagem">
+    <h2><span class="num">2</span> A linhagem dos LLMs (2018-2024)</h2>
+
+    <table class="compare">
+      <thead><tr><th>Ano</th><th>Modelo</th><th>Parâmetros</th><th>Marco</th></tr></thead>
+      <tbody>
+        <tr><td>2018</td><td>BERT-base / large (Google)</td><td>110 M / 340 M</td><td>Pré-treino em larga escala para entendimento</td></tr>
+        <tr><td>2018</td><td>GPT-1 (OpenAI)</td><td>117 M</td><td>Pré-treino + fine-tuning autoregressivo</td></tr>
+        <tr><td>2019</td><td>GPT-2 (OpenAI)</td><td>1,5 B</td><td>Geração de texto coerente em vários domínios</td></tr>
+        <tr><td>2019</td><td>RoBERTa (Facebook)</td><td>355 M</td><td>BERT melhorado em receita de treino</td></tr>
+        <tr><td>2019</td><td>T5 (Google)</td><td>11 B</td><td>Tudo é texto-para-texto</td></tr>
+        <tr><td>2020</td><td>GPT-3 (OpenAI)</td><td>175 B</td><td>Few-shot learning emergente</td></tr>
+        <tr><td>2021</td><td>Codex (OpenAI)</td><td>12 B</td><td>GPT especializado em código → GitHub Copilot</td></tr>
+        <tr><td>2022</td><td>PaLM (Google)</td><td>540 B</td><td>Chain-of-Thought reasoning</td></tr>
+        <tr><td>2022</td><td>ChatGPT (OpenAI)</td><td>~175 B</td><td>GPT-3.5 + RLHF → produto viral</td></tr>
+        <tr><td>2022</td><td>Chinchilla (DeepMind)</td><td>70 B</td><td>Lei de escala revisada: mais dados, menos parâmetros</td></tr>
+        <tr><td>2023</td><td>GPT-4 (OpenAI)</td><td>~1,8 T (rumor)</td><td>Multimodal, raciocínio avançado, MoE</td></tr>
+        <tr><td>2023</td><td>Claude (Anthropic)</td><td>?</td><td>Constitutional AI</td></tr>
+        <tr><td>2023</td><td>LLaMA-2 (Meta)</td><td>7-70 B</td><td>Open weights</td></tr>
+        <tr><td>2023</td><td>Mistral / Mixtral</td><td>7-46 B</td><td>Open weights, MoE</td></tr>
+        <tr><td>2023</td><td>Gemini (Google)</td><td>?</td><td>Multimodal nativo</td></tr>
+        <tr><td>2024</td><td>o1 (OpenAI)</td><td>?</td><td>Raciocínio com chain-of-thought longa</td></tr>
+        <tr><td>2024</td><td>Claude 3.5 / Sonnet 4</td><td>?</td><td>Tool use, computer use, raciocínio estendido</td></tr>
+        <tr><td>2024</td><td>LLaMA-3 (Meta)</td><td>até 405 B</td><td>Open weights de fronteira</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ============ TRÊS FAMÍLIAS ============ -->
+  <section class="block" id="tres">
+    <h2><span class="num">3</span> Três famílias de Transformers</h2>
+
+    <div class="cards">
+      <div class="card">
+        <div class="ck">Encoder-only</div>
+        <div class="cv">BERT, RoBERTa, DeBERTa</div>
+      </div>
+      <div class="card">
+        <div class="ck">Decoder-only</div>
+        <div class="cv">GPT, Claude, LLaMA, Mistral</div>
+      </div>
+      <div class="card">
+        <div class="ck">Encoder-decoder</div>
+        <div class="cv">T5, BART, FLAN-T5</div>
+      </div>
+    </div>
+
+    <h3>Encoder-only — para entender</h3>
+    <p>
+      Treinados com <strong>masked language modeling</strong>: 15% dos tokens
+      são mascarados, e o modelo prevê quais eram. Tem visão bidirecional —
+      cada token "vê" o contexto à esquerda e à direita.
+    </p>
+    <p>
+      Ideal para: classificação de texto, NER, extração de informação,
+      embeddings semânticos (para busca, similaridade).
+    </p>
+
+    <h3>Decoder-only — para gerar</h3>
+    <p>
+      Treinados com <strong>next-token prediction</strong>: prever o próximo
+      token dado o contexto anterior. Visão unidirecional (causal). Geram
+      texto autoregressivamente.
+    </p>
+    <p>
+      Ideal para: chat, código, escrita criativa, raciocínio. <strong>É a
+      família dominante hoje</strong>.
+    </p>
+
+    <h3>Encoder-decoder — para transformar</h3>
+    <p>
+      Encoder lê a entrada; decoder gera a saída condicionada. Versátil mas
+      mais caro de treinar.
+    </p>
+    <p>
+      Ideal para: tradução, sumarização, parafraseamento, conversões formais.
+    </p>
+  </section>
+
+  <!-- ============ SCALING ============ -->
+  <section class="block" id="scaling">
+    <h2><span class="num">4</span> As leis de escala</h2>
+
+    <p>
+      Em 2020, pesquisadores da OpenAI publicaram "Scaling Laws for Neural
+      Language Models" (Kaplan et al.). Conclusão chocante: a perda do
+      modelo segue uma <strong>lei de potência</strong> com três variáveis:
+    </p>
+    <ul>
+      <li><strong>N</strong> — número de parâmetros do modelo</li>
+      <li><strong>D</strong> — número de tokens de treino</li>
+      <li><strong>C</strong> — compute total</li>
+    </ul>
+
+    <div class="formula">
+      L(N) = (Nc / N)^α  +  L_∞<br>
+      <span style="color:var(--muted)">A perda diminui suavemente conforme aumentamos N, D ou C.</span>
+    </div>
+
+    <p>
+      Esse foi um achado bombástico: <strong>não havia diminishing returns</strong>
+      no horizonte. Toda vez que você aumentava a escala, a performance melhorava
+      previsivelmente. Isso justificou investimentos massivos em GPUs.
+    </p>
+
+    <h3>Chinchilla (2022) — a correção</h3>
+    <p>
+      Em 2022, a DeepMind publicou "Training Compute-Optimal Large Language Models".
+      Conclusão: a regra de Kaplan privilegiava modelos grandes demais para os
+      dados disponíveis. O ideal seria treinar <em>modelos menores em mais dados</em>.
+      Especificamente: para cada parâmetro, ~20 tokens de treino.
+    </p>
+    <p>
+      Chinchilla (70 B params, 1,4 T tokens) bateu Gopher (280 B params, 300 B tokens)
+      usando o mesmo compute. Mudou completamente como modelos são treinados desde então.
+    </p>
+
+    <div class="callout">
+      <span class="tag">Implicação prática</span>
+      <p>
+        Modelos abertos modernos (LLaMA-3, Mistral) seguem proporções Chinchilla
+        ou ainda mais agressivas (15-30 tokens/param). LLaMA-3 8B foi treinado em
+        ~15 trilhões de tokens, mostrando que pequenos modelos super-treinados
+        podem rivalizar com gigantes.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ EMERGÊNCIA ============ -->
+  <section class="block" id="emergencia">
+    <h2><span class="num">5</span> Capacidades emergentes</h2>
+
+    <p>
+      Uma das descobertas mais fascinantes dos LLMs: <strong>algumas capacidades
+      aparecem subitamente acima de certa escala</strong>, sem aviso prévio nas
+      curvas de perda.
+    </p>
+
+    <p>
+      Capacidades documentadas como emergentes:
+    </p>
+    <ul>
+      <li><strong>Few-shot learning</strong> — aprender a partir de poucos exemplos no prompt.</li>
+      <li><strong>Chain-of-Thought reasoning</strong> — resolver problemas passo a passo.</li>
+      <li><strong>Aritmética com múltiplos dígitos</strong>.</li>
+      <li><strong>Tradução para línguas com pouco treino</strong>.</li>
+      <li><strong>Seguir instruções complexas</strong>.</li>
+      <li><strong>Programar a partir de descrições naturais</strong>.</li>
+    </ul>
+
+    <div class="analogy">
+      <span class="tag">Analogia · ferver água</span>
+      <p>
+        Aqueça uma panela. Aos 60°C, nada acontece. Aos 90°C, nada acontece.
+        Aos 99°C, nada acontece. Aos 100°C, <em>a água ferve</em> — transição
+        de fase. Algumas capacidades dos LLMs emergem assim: imperceptíveis em
+        modelos menores, e súbitas em uma escala crítica.
+      </p>
+    </div>
+
+    <div class="callout">
+      <span class="tag">Debate em aberto</span>
+      <p>
+        Pesquisadores em 2023 questionaram se algumas emergências são "miragens"
+        causadas por métricas descontínuas (Schaeffer et al., "Are Emergent
+        Abilities of Large Language Models a Mirage?"). O debate continua, mas
+        é claro que mudanças qualitativas acontecem com a escala.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ TOKENS ============ -->
+  <section class="block" id="tokens">
+    <h2><span class="num">6</span> Tokenização e vocabulário</h2>
+
+    <p>
+      LLMs não veem palavras — veem <strong>tokens</strong>. A tokenização é
+      tipicamente feita por:
+    </p>
+    <ul>
+      <li><strong>BPE (Byte Pair Encoding)</strong> — começa com caracteres, funde os pares mais frequentes até atingir um vocabulário-alvo. Usado em GPT.</li>
+      <li><strong>WordPiece</strong> — variante do BPE usada no BERT.</li>
+      <li><strong>SentencePiece</strong> — independente de língua, usada em T5 e LLaMA.</li>
+      <li><strong>Tiktoken</strong> — implementação rápida em Rust, usada pela OpenAI.</li>
+    </ul>
+
+    <h3>Curiosidades</h3>
+    <ul>
+      <li>"hello" geralmente é 1 token. "Olá" pode ser 2 (mais raro em inglês).</li>
+      <li>Espaços em branco fazem parte do token (" world" ≠ "world").</li>
+      <li>1 token ≈ 4 caracteres em inglês ≈ 0,75 palavras.</li>
+      <li>Vocabulários típicos: 30K (BERT), 50K (GPT-2/3), 100K+ (GPT-4, LLaMA-3).</li>
+      <li>Emojis e idiomas raros consomem mais tokens — daí o custo maior para usuários não-anglófonos.</li>
+    </ul>
+  </section>
+
+  <!-- ============ PRÉ-TREINO ============ -->
+  <section class="block" id="pretreino">
+    <h2><span class="num">7</span> Pré-treino: detalhes</h2>
+
+    <h3>Dados</h3>
+    <p>
+      Conjuntos de pré-treino modernos misturam várias fontes:
+    </p>
+    <ul>
+      <li><strong>Common Crawl</strong> — snapshots da web. ~250 TB filtrados em algumas dezenas de TB de tokens.</li>
+      <li><strong>Wikipedia</strong> — em várias línguas.</li>
+      <li><strong>Livros</strong> — Project Gutenberg, Books3.</li>
+      <li><strong>Código</strong> — GitHub, código aberto.</li>
+      <li><strong>Artigos científicos</strong> — arXiv, PubMed.</li>
+      <li><strong>Fóruns</strong> — Reddit, StackExchange.</li>
+    </ul>
+
+    <p>
+      A "qualidade" dos dados importa tanto quanto a quantidade. Modelos
+      treinados em texto curado (Phi-2, Phi-3 da Microsoft) podem rivalizar
+      com modelos muito maiores treinados em dados ruidosos.
+    </p>
+
+    <h3>Objetivo</h3>
+    <p>
+      Para decoder-only (GPT-style): minimizar <strong>cross-entropy do próximo
+      token</strong>. Para encoder-only (BERT-style): minimizar perda em tokens
+      mascarados.
+    </p>
+
+    <h3>Compute</h3>
+    <p>
+      GPT-3: ~3.640 PetaFLOP/s-days. Custo estimado: $4,6 milhões em GPUs
+      A100 alugadas. GPT-4: rumores de $100 milhões. Modelos de fronteira de
+      2024-25 podem custar bilhões para treinar.
+    </p>
+  </section>
+
+  <!-- ============ SFT ============ -->
+  <section class="block" id="sft">
+    <h2><span class="num">8</span> SFT — Supervised Fine-Tuning</h2>
+
+    <p>
+      Depois do pré-treino, o modelo sabe muito mas é "selvagem". Dada a
+      pergunta "Qual a capital do Brasil?", ele pode responder corretamente, ou
+      gerar uma lista de perguntas similares, ou começar a inventar uma
+      enciclopédia. O SFT ensina o modelo a se comportar como assistente.
+    </p>
+
+    <p>
+      Coleta-se um dataset de pares <strong>(prompt, resposta de qualidade)</strong>
+      escritos por humanos. Tipos de exemplos:
+    </p>
+    <ul>
+      <li>Perguntas e respostas factuais.</li>
+      <li>Pedidos de resumo, tradução, conversão.</li>
+      <li>Escrita criativa, código.</li>
+      <li>Diálogos multi-turn.</li>
+      <li>Recusas educadas a pedidos problemáticos.</li>
+    </ul>
+
+    <p>
+      O dataset do InstructGPT (precursor do ChatGPT) tinha ~13K exemplos
+      escritos por anotadores. Modelos modernos podem usar milhões.
+    </p>
+
+    <p>
+      O treino é normal — cross-entropy nos tokens da resposta. Mas usar
+      esses poucos milhares de exemplos de alta qualidade tem efeito gigantesco
+      em como o modelo se comporta.
+    </p>
+  </section>
+
+  <!-- ============ RLHF ============ -->
+  <section class="block" id="rlhf">
+    <h2><span class="num">9</span> RLHF — feedback humano</h2>
+
+    <p>
+      A última fase mágica: <strong>Reinforcement Learning from Human Feedback</strong>.
+      Foi a chave para o sucesso do ChatGPT.
+    </p>
+
+    <h3>O processo</h3>
+    <ol>
+      <li><strong>Coletar comparações</strong>: humanos veem 2-4 respostas do modelo a um mesmo prompt e ordenam por qualidade.</li>
+      <li><strong>Treinar um reward model</strong>: rede neural que prevê o score de uma resposta. Treinada nas comparações.</li>
+      <li><strong>Otimizar o LLM</strong>: usar RL (PPO) para maximizar o reward predito, com penalidade KL para não se afastar muito do modelo SFT inicial.</li>
+    </ol>
+
+    <div class="formula">
+      objetivo = 𝔼[r(x, y)] − β · KL(π(y|x) || π_SFT(y|x))
+    </div>
+
+    <p>
+      O termo KL evita que o modelo "explore" demais e perca habilidades do
+      pré-treino. β controla o tradeoff.
+    </p>
+
+    <h3>DPO — uma simplificação (2023)</h3>
+    <p>
+      <strong>Direct Preference Optimization</strong> (Rafailov et al., 2023):
+      mostra que dá para otimizar direto das comparações, sem treinar reward
+      model separado. Mais simples e estável. Está virando padrão.
+    </p>
+
+    <div class="analogy">
+      <span class="tag">Analogia · personal trainer</span>
+      <p>
+        Imagine alguém aprendendo a cozinhar. Primeiro ele leu mil livros (pré-treino).
+        Depois fez vários cursos com receitas claras (SFT). Agora um chef o
+        observa e diz: "esse prato ficou melhor que aquele" várias vezes.
+        Ele aprende, pelo feedback de qualidade <em>comparativa</em>, o que é um
+        bom prato — sem que ninguém precise dar nota absoluta. Esse é o RLHF.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ CONSTITUTIONAL ============ -->
+  <section class="block" id="constitutional">
+    <h2><span class="num">10</span> Constitutional AI (Anthropic)</h2>
+
+    <p>
+      A Anthropic propôs em 2022 uma alternativa ao RLHF puro: <strong>Constitutional
+      AI</strong>. Em vez de só feedback humano, o modelo recebe uma "constituição"
+      — princípios escritos sobre como deve se comportar — e <em>usa essa
+      constituição para criticar e melhorar suas próprias respostas</em>.
+    </p>
+
+    <h3>Etapas</h3>
+    <ol>
+      <li><strong>SL-CAI</strong> (Supervised Learning from Constitutional AI):
+          O modelo gera respostas, depois é instruído a criticá-las e revisá-las
+          à luz da constituição. As respostas revisadas viram dados de treino.</li>
+      <li><strong>RL-CAI</strong> (RL from AI Feedback): em vez de feedback humano,
+          o próprio modelo (com a constituição) compara pares de respostas.
+          Treina-se um reward model dessas comparações.</li>
+    </ol>
+
+    <p>
+      Vantagens:
+    </p>
+    <ul>
+      <li>Reduz a carga humana de anotação.</li>
+      <li>Mais transparente — os princípios são públicos.</li>
+      <li>Escalável — o modelo se "auto-supervisiona".</li>
+    </ul>
+
+    <p>
+      Claude usa uma combinação de RLHF e Constitutional AI.
+    </p>
+  </section>
+
+  <!-- ============ PROMPTING ============ -->
+  <section class="block" id="prompting">
+    <h2><span class="num">11</span> Prompting, CoT, few-shot</h2>
+
+    <h3>Few-shot prompting</h3>
+    <p>
+      Descoberto com o GPT-3: você pode "ensinar" o modelo uma nova tarefa
+      mostrando alguns exemplos no prompt — sem ajustar pesos. Isso é
+      <strong>in-context learning</strong>.
+    </p>
+
+    <pre class="code"><span class="com">Prompt:</span>
+Inglês: cat
+Português: gato
+
+Inglês: dog
+Português: cachorro
+
+Inglês: house
+Português: ___
+
+<span class="com">Resposta:</span> casa</pre>
+
+    <h3>Chain-of-Thought (CoT)</h3>
+    <p>
+      Em 2022, Wei et al. mostraram que pedir ao modelo para "pensar passo a
+      passo" antes de responder melhora drasticamente em problemas matemáticos
+      e de raciocínio. "Let's think step by step" virou mantra.
+    </p>
+
+    <pre class="code"><span class="com">Prompt:</span>
+Q: Bia tem 5 maçãs. Ela come 2 e ganha 3. Quantas tem?
+A: Vamos pensar passo a passo. Bia começou com 5. Comeu 2,
+então tem 5-2=3. Ganhou 3, então tem 3+3=6. Resposta: 6.</pre>
+
+    <h3>Self-consistency</h3>
+    <p>
+      Em vez de uma resposta, gerar várias respostas CoT e pegar a mais
+      frequente. Melhora ainda mais em raciocínio.
+    </p>
+
+    <h3>ReAct (Reasoning + Acting)</h3>
+    <p>
+      Intercalar passos de raciocínio com chamadas a ferramentas externas
+      (calculadora, busca web, código). Base de agentes modernos.
+    </p>
+  </section>
+
+  <!-- ============ TOOLS ============ -->
+  <section class="block" id="tools">
+    <h2><span class="num">12</span> Agentes e ferramentas</h2>
+
+    <p>
+      LLMs sozinhos têm limitações: não sabem informações pós-treino, não
+      podem executar código, não acessam APIs. A solução: dar-lhes ferramentas.
+    </p>
+
+    <h3>Function calling / tool use</h3>
+    <p>
+      O modelo aprende um formato (JSON, XML) para chamar funções. Exemplo:
+    </p>
+    <pre class="code">{ "tool": "search_web", "query": "previsão tempo SP 2026-05-22" }</pre>
+    <p>
+      O sistema executa, retorna o resultado, e o modelo continua a
+      conversa.
+    </p>
+
+    <h3>Tipos de ferramentas usadas em produção</h3>
+    <ul>
+      <li><strong>Web search</strong> — para informações atualizadas.</li>
+      <li><strong>Calculadora / Python REPL</strong> — para cálculos exatos.</li>
+      <li><strong>Acesso a arquivos</strong> — leitura, escrita, edição.</li>
+      <li><strong>APIs específicas</strong> — Slack, Gmail, GitHub, banco de dados.</li>
+      <li><strong>Computer use</strong> (Claude 3.5+) — controlar o computador via screenshots.</li>
+      <li><strong>MCP — Model Context Protocol</strong> (Anthropic, 2024) — padrão aberto para conectar LLMs a ferramentas.</li>
+    </ul>
+
+    <h3>Agentes</h3>
+    <p>
+      Quando um LLM usa ferramentas em loops longos para resolver tarefas,
+      chamamos de <strong>agente</strong>. Exemplos: Claude Code, Cursor,
+      Replit Agent. Eles podem planejar, executar código, verificar resultados
+      e iterar.
+    </p>
+  </section>
+
+  <!-- ============ MULTIMODAL ============ -->
+  <section class="block" id="multimodal">
+    <h2><span class="num">13</span> Multimodalidade</h2>
+
+    <p>
+      LLMs modernos não são só texto. Eles processam imagens, áudio, vídeo —
+      e até geram dessas modalidades.
+    </p>
+
+    <h3>Imagem → texto</h3>
+    <p>
+      GPT-4V, Claude 3, Gemini todos aceitam imagens como entrada. A imagem
+      é processada por um encoder (geralmente ViT ou similar) e os tokens
+      visuais são intercalados com tokens de texto.
+    </p>
+
+    <h3>Texto → imagem</h3>
+    <p>
+      DALL-E, Midjourney, Stable Diffusion — geralmente usam difusão, não
+      LLMs propriamente. Mas Gemini e GPT-4o têm geração nativa.
+    </p>
+
+    <h3>Áudio</h3>
+    <p>
+      Whisper (OpenAI), Gemini Live, ChatGPT Advanced Voice — entrada e saída
+      de voz em tempo real, com latência baixa o suficiente para conversa
+      natural.
+    </p>
+
+    <h3>Modelos verdadeiramente multimodais</h3>
+    <p>
+      Gemini é treinado nativamente em texto, imagem, áudio e vídeo. GPT-4o
+      faz processo similar. A tendência é unificar todas as modalidades em um
+      único modelo grande.
+    </p>
+  </section>
+
+  <!-- ============ PROBLEMAS ============ -->
+  <section class="block" id="problemas">
+    <h2><span class="num">14</span> Problemas conhecidos</h2>
+
+    <h3>Alucinações</h3>
+    <p>
+      LLMs inventam fatos com confiança. A causa raiz: foram treinados para
+      "soar plausível", não para "ser verdade". Mitigações: RLHF para
+      penalizar afirmações falsas, retrieval-augmented generation (RAG),
+      tool use para verificar.
+    </p>
+
+    <h3>Viés</h3>
+    <p>
+      Os dados de treino refletem preconceitos da sociedade. Modelos podem
+      reproduzir estereótipos de gênero, raça, religião. Esforços ativos em
+      RLHF e fine-tuning tentam mitigar, mas o problema é parcialmente
+      inerente aos dados.
+    </p>
+
+    <h3>Jailbreaks</h3>
+    <p>
+      Prompts engenhosos que fazem o modelo violar suas próprias regras.
+      Uma corrida armamentista contínua entre atacantes e defensores.
+    </p>
+
+    <h3>Custo computacional</h3>
+    <p>
+      Treinar modelos de fronteira custa centenas de milhões de dólares e
+      consome megawatts de energia. Inferência também é cara em escala.
+    </p>
+
+    <h3>Janela de contexto</h3>
+    <p>
+      Mesmo com 1 milhão de tokens (Gemini, Claude), modelos têm dificuldade
+      em usar bem informações no meio do contexto ("lost in the middle").
+    </p>
+
+    <h3>Falta de "verdadeiro" raciocínio</h3>
+    <p>
+      Debatido se LLMs raciocinam ou apenas combinam padrões aprendidos.
+      Modelos como o1 (OpenAI) e Claude com extended thinking tentam
+      melhorar com cadeias de pensamento longas.
+    </p>
+  </section>
+
+  <!-- ============ FUTURO ============ -->
+  <section class="block" id="futuro">
+    <h2><span class="num">15</span> O futuro próximo</h2>
+
+    <p>
+      Quatro frentes ativas em 2024-2025:
+    </p>
+
+    <h3>1. Raciocínio explícito</h3>
+    <p>
+      Modelos como <strong>o1</strong> (OpenAI) e Claude com extended thinking
+      gastam mais compute na inferência, "pensando" antes de responder. Uma
+      nova lei de escala: melhorar resultados aumentando o pensamento durante
+      o uso.
+    </p>
+
+    <h3>2. Agentes autônomos</h3>
+    <p>
+      LLMs operando em loops longos com ferramentas. Claude Code, Devin, Replit
+      Agent, OpenAI Operator — todos apontam para um futuro onde agentes
+      executam tarefas complexas por horas.
+    </p>
+
+    <h3>3. Multimodalidade nativa e em tempo real</h3>
+    <p>
+      GPT-4o, Gemini Live, ChatGPT Advanced Voice — conversa em voz com
+      latência humana. Tendência: vídeo em tempo real, geração de vídeo (Sora).
+    </p>
+
+    <h3>4. Eficiência e modelos pequenos</h3>
+    <p>
+      Phi (Microsoft), Mistral 7B, LLaMA-3 8B — modelos pequenos mas
+      poderosos, viáveis em laptops. Distilação de modelos grandes para
+      menores. MoE (Mixture-of-Experts) para ativar só parte dos parâmetros.
+    </p>
+
+    <h3>5. Alternativas ao Transformer</h3>
+    <p>
+      <strong>Mamba</strong> e <strong>State Space Models</strong> (2023-2024)
+      tratam sequências em tempo linear. Ainda em pesquisa, mas podem destronar
+      o Transformer em domínios com sequências muito longas (genoma, áudio).
+    </p>
+  </section>
+
+  <!-- ============ ARTIGOS ============ -->
+  <section class="block" id="artigos">
+    <h2><span class="num">16</span> Artigos marcantes</h2>
+
+    <div class="papers">
+      <div class="paper">
+        <span class="pyear">2017</span><span class="ptitle">Attention Is All You Need</span><br>
+        <span class="pauthors">Vaswani et al. — Google</span>
+        <div class="psumm">A arquitetura que tornou tudo possível.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2018</span><span class="ptitle">BERT</span><br>
+        <span class="pauthors">Devlin et al. — Google</span>
+        <div class="psumm">Pré-treino + fine-tuning em escala.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2018</span><span class="ptitle">GPT-1: Improving Language Understanding by Generative Pre-Training</span><br>
+        <span class="pauthors">Radford et al. — OpenAI</span>
+        <div class="psumm">Primeira família GPT.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2019</span><span class="ptitle">GPT-2: Language Models are Unsupervised Multitask Learners</span><br>
+        <span class="pauthors">Radford et al.</span>
+      </div>
+      <div class="paper">
+        <span class="pyear">2020</span><span class="ptitle">GPT-3: Language Models are Few-Shot Learners</span><br>
+        <span class="pauthors">Brown, Mann, Ryder, … — OpenAI</span>
+        <div class="psumm">175B params, in-context learning.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2020</span><span class="ptitle">Scaling Laws for Neural Language Models</span><br>
+        <span class="pauthors">Kaplan, McCandlish et al. — OpenAI</span>
+      </div>
+      <div class="paper">
+        <span class="pyear">2022</span><span class="ptitle">Chain-of-Thought Prompting Elicits Reasoning</span><br>
+        <span class="pauthors">Wei et al. — Google</span>
+      </div>
+      <div class="paper">
+        <span class="pyear">2022</span><span class="ptitle">Training Compute-Optimal LLMs (Chinchilla)</span><br>
+        <span class="pauthors">Hoffmann et al. — DeepMind</span>
+      </div>
+      <div class="paper">
+        <span class="pyear">2022</span><span class="ptitle">Training language models to follow instructions with human feedback (InstructGPT)</span><br>
+        <span class="pauthors">Ouyang et al. — OpenAI</span>
+        <div class="psumm">O RLHF que viabilizou o ChatGPT.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2022</span><span class="ptitle">Constitutional AI</span><br>
+        <span class="pauthors">Bai et al. — Anthropic</span>
+        <div class="psumm">Alternativa baseada em princípios escritos.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2022</span><span class="ptitle">Emergent Abilities of Large Language Models</span><br>
+        <span class="pauthors">Wei et al. — Google</span>
+      </div>
+      <div class="paper">
+        <span class="pyear">2023</span><span class="ptitle">GPT-4 Technical Report</span><br>
+        <span class="pauthors">OpenAI</span>
+        <div class="psumm">Modelo multimodal de fronteira.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2023</span><span class="ptitle">LLaMA: Open and Efficient Foundation Language Models</span><br>
+        <span class="pauthors">Touvron et al. — Meta</span>
+      </div>
+      <div class="paper">
+        <span class="pyear">2023</span><span class="ptitle">Direct Preference Optimization (DPO)</span><br>
+        <span class="pauthors">Rafailov et al. — Stanford</span>
+      </div>
+      <div class="paper">
+        <span class="pyear">2023</span><span class="ptitle">ReAct: Synergizing Reasoning and Acting</span><br>
+        <span class="pauthors">Yao et al. — Princeton + Google</span>
+      </div>
+      <div class="paper">
+        <span class="pyear">2024</span><span class="ptitle">Scaling Monosemanticity</span><br>
+        <span class="pauthors">Anthropic Interpretability Team</span>
+        <div class="psumm">Features interpretáveis extraídas de Claude.</div>
+      </div>
+      <div class="paper">
+        <span class="pyear">2024</span><span class="ptitle">o1: Learning to Reason with LLMs</span><br>
+        <span class="pauthors">OpenAI</span>
+        <div class="psumm">Reasoning intensivo no tempo de inferência.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ APROFUNDAR ============ -->
+  <section class="block" id="aprofundar">
+    <h2><span class="num">17</span> Para se aprofundar</h2>
+
+    <ul>
+      <li><strong>Andrej Karpathy — "Let's reproduce GPT-2 (124M)"</strong> e <strong>"Intro to LLMs"</strong> no YouTube.</li>
+      <li><strong>Hugging Face — NLP Course</strong>: gratuito e excelente.</li>
+      <li><strong>Anthropic — Transformer Circuits</strong>: tentativa de entender mecanismos internos.</li>
+      <li><strong>Sebastian Raschka — "Build a Large Language Model From Scratch"</strong> (livro 2024).</li>
+      <li><strong>Stanford CS324 — Large Language Models</strong>.</li>
+      <li><strong>Lilian Weng's blog</strong>: posts profundos sobre RLHF, prompt engineering, agentes.</li>
+      <li><strong>Anthropic Cookbook</strong>: receitas para uso prático de Claude.</li>
+      <li><strong>The Bitter Lesson</strong> — Rich Sutton, 2019. Ensaio essencial sobre o papel da escala em IA.</li>
+    </ul>
+  </section>
+
+  <a href="index.html" class="deeplink">
+    <span class="arrow">←</span>
+    <span class="dt">Fim da jornada</span>
+    <span class="dn">Voltar ao índice geral</span>
+  </a>
+
+  <footer>
+    <p>Página detalhada · LLMs Modernos · Parte do projeto <a href="index.html">Histórico de Evolução dos Modelos de IA</a></p>
+  </footer>
+</div>
+</body>
+</html>
